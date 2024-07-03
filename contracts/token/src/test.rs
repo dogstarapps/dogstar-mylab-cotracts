@@ -3,9 +3,7 @@ extern crate std;
 
 use crate::{contract::Token, TokenClient};
 use soroban_sdk::{
-    symbol_short,
-    testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation},
-    Address, Env, IntoVal, Symbol,
+    symbol_short, testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation}, vec, Address, Env, IntoVal, Symbol
 };
 
 fn create_token<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {
@@ -135,6 +133,33 @@ fn test() {
         )]
     );
     assert_eq!(token.allowance(&user2, &user3), 0);
+}
+
+#[test]
+fn test_batch_mint() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin1 = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let token = create_token(&e, &admin1);
+
+    // Create Vec<Address> for to_addresses
+    let to_addresses = vec![&e, user1.clone(), user2.clone(), user3.clone()];
+
+    // Create Vec<i128> for amounts
+    let amounts = vec![&e, 100_i128, 200_i128, 300_i128];
+    
+    token.batch_mint(
+        &to_addresses,
+        &amounts,
+    );
+
+    assert_eq!(token.balance(&user1), 100);
+    assert_eq!(token.balance(&user2), 200);
+    assert_eq!(token.balance(&user3), 300);
 }
 
 #[test]
