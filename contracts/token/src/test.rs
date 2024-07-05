@@ -24,6 +24,9 @@ fn test() {
     let user3 = Address::generate(&e);
     let token = create_token(&e, &admin1);
 
+    let members = vec![&e, user1.clone(), user2.clone(), user3.clone()];
+    token.add_to_whitelist( &members);
+
     token.mint(&user1, &1000);
     assert_eq!(
         e.auths(),
@@ -232,6 +235,7 @@ fn transfer_insufficient_balance() {
     token.mint(&user1, &1000);
     assert_eq!(token.balance(&user1), 1000);
 
+    token.add_to_whitelist(&vec![&e.clone(), user1.clone()]);
     token.transfer(&user1, &user2, &1001);
 }
 
@@ -252,6 +256,8 @@ fn transfer_from_insufficient_allowance() {
 
     token.approve(&user1, &user3, &100, &200);
     assert_eq!(token.allowance(&user1, &user3), 100);
+
+    token.add_to_whitelist(&vec![&e.clone(), user3.clone()]);
 
     token.transfer_from(&user3, &user1, &user2, &101);
 }
@@ -286,6 +292,7 @@ fn test_zero_allowance() {
     let from = Address::generate(&e);
     let token = create_token(&e, &admin);
 
+    token.add_to_whitelist(&vec![&e.clone(), spender.clone()]);
     token.transfer_from(&spender, &from, &spender, &0);
     assert!(token.get_allowance(&from, &spender).is_none());
 }

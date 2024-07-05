@@ -16,3 +16,10 @@ pub fn write_administrator(e: &Env, id: &Address) {
     let key = DataKey::Admin;
     e.storage().instance().set(&key, id);
 }
+
+pub fn is_whitelisted(e: &Env, member: &Address) -> bool {
+    e.storage()
+        .persistent()
+        .get(&DataKey::Whitelist(member.clone()))
+        .unwrap_or(false)
+}

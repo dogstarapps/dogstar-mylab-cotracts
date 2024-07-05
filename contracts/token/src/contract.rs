@@ -1,14 +1,15 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
-use crate::admin::{has_administrator, read_administrator, write_administrator};
+use crate::admin::{has_administrator, read_administrator, write_administrator, is_whitelisted};
 use crate::allowance::{read_allowance, spend_allowance, write_allowance};
 use crate::balance::{read_balance, receive_balance, spend_balance};
 use crate::metadata::{read_decimal, read_name, read_symbol, write_metadata};
+
 #[cfg(test)]
-use crate::storage_types::{AllowanceDataKey, AllowanceValue, DataKey};
-use crate::storage_types::{INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
+use crate::storage_types::{AllowanceValue, AllowanceDataKey};
+use crate::storage_types::{INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD, DataKey};
 use soroban_sdk::token::{self, Interface as _};
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
 use soroban_token_sdk::metadata::TokenMetadata;
 use soroban_token_sdk::TokenUtils;
 
@@ -70,7 +71,9 @@ impl Token {
         for (to, amount) in to_addresses.iter().zip(amounts.iter()) {
             check_nonnegative_amount(amount);
             receive_balance(&e, to.clone(), amount);
-            TokenUtils::new(&e).events().mint(admin.clone(), to.clone(), amount);
+            TokenUtils::new(&e)
+                .events()
+                .mint(admin.clone(), to.clone(), amount);
         }
     }
 
@@ -91,6 +94,35 @@ impl Token {
         let key = DataKey::Allowance(AllowanceDataKey { from, spender });
         let allowance = e.storage().temporary().get::<_, AllowanceValue>(&key);
         allowance
+    }
+
+    pub fn add_to_whitelist(e: &Env, members: Vec<Address>) {
+        let admin = read_administrator(e);
+        admin.require_auth();
+
+        for member in members.iter() {
+            e.storage()
+                .persistent()
+                .set(&DataKey::Whitelist(member.clone()), &true);
+        }
+    }
+
+    pub fn remove_from_whitelist(e: &Env, members: Vec<Address>) {
+        let admin = read_administrator(e);
+        admin.require_auth();
+
+        for member in members.iter() {
+            e.storage()
+                .persistent()
+                .remove(&DataKey::Whitelist(member.clone()));
+        }
+    }
+
+    pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
+        let admin: Address = e.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+
+        e.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 }
 
@@ -128,6 +160,10 @@ impl token::Interface for Token {
     fn transfer(e: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
 
+        if !is_whitelisted(&e, &from) {
+            panic!("Caller is not whitelisted");
+        }
+
         check_nonnegative_amount(amount);
 
         e.storage()
@@ -141,6 +177,10 @@ impl token::Interface for Token {
 
     fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
+
+        if !is_whitelisted(&e, &spender) {
+            panic!("Caller is not whitelisted");
+        }
 
         check_nonnegative_amount(amount);
 

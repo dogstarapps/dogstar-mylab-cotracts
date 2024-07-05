@@ -5,6 +5,8 @@ mod allowance;
 mod balance;
 mod contract;
 mod metadata;
+mod user_info;
+mod nft_info;
 mod storage_types;
 mod test;
 

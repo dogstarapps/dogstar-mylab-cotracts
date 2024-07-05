@@ -20,4 +20,8 @@ pub enum DataKey {
     ApprovalForAll(Address, Address),
     Admin,
     Metadata,
+    Whitelist(Address),
+    UserLevel(Address),
+    NFTLevel(TokenId),
+    NFTLock(TokenId),
 }
