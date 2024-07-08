@@ -1,29 +1,86 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
-use crate::storage_types::{DataKey, TokenId};
+use crate::storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
-pub fn write_nft_level(e: &Env, token_id: TokenId, level: u64) {
-    e.storage()
-        .persistent()
-        .set(&DataKey::NFTLevel(token_id), &level);
+#[derive(Clone)]
+#[contracttype]
+pub enum Category {
+    Leader,
+    Human,
+    Skill,
+    Weapon,
 }
 
-pub fn read_nft_level(e: &Env, token_id: TokenId) -> u64 {
-    e.storage()
-        .persistent()
-        .get(&DataKey::NFTLevel(token_id))
-        .unwrap_or(0)
+#[derive(Clone, PartialEq)]
+#[contracttype]
+pub enum Currency {
+    Terry,
+    Xtar,
 }
 
-pub fn write_nft_lock(e: &Env, token_id: TokenId, locker: Option<Address>) {
-    e.storage()
-        .persistent()
-        .set(&DataKey::NFTLock(token_id), &locker);
+#[derive(Clone)]
+#[contracttype]
+pub enum Action {
+    None,
+    Stake,
+    Fight,
+    LendAndBorrow,
+    Burn,
+    Deck,
 }
 
-pub fn read_nft_lock(e: &Env, token_id: TokenId) -> Option<Address> {
-    e.storage()
+#[derive(Clone)]
+#[contracttype]
+pub struct CardInfo {
+    pub dl_level: u32,
+    pub initial_power: u32,
+    pub max_power: u32,
+    pub price_xtar: i128,
+    pub price_terry: i128,
+    pub locked_by_action: Action,
+}
+
+impl CardInfo {
+    pub fn get_default_card(category: Category) -> Self {
+        Self {
+            dl_level: 0,
+            initial_power: 0,
+            max_power: 100,
+            price_terry: 100,
+            price_xtar: 100,
+            locked_by_action: Action::None,
+        }
+    }
+}
+
+pub fn write_nft(env: &Env, owner: Address, category: Category, token_id: TokenId, nft: CardInfo) {
+    let key = DataKey::Card(owner, category, token_id);
+    env.storage().persistent().set(&key, &nft);
+    env.storage()
         .persistent()
-        .get(&DataKey::NFTLock(token_id))
-        .unwrap_or(None)
+        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+}
+
+pub fn read_nft(env: &Env, owner: Address, category: Category, token_id: TokenId) -> CardInfo {
+    let key = DataKey::Card(owner, category, token_id);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    env.storage().persistent().get(&key).unwrap()
+}
+
+pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
+    let key = DataKey::Card(owner, category, token_id);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    env.storage().persistent().has(&key)
+}
+
+pub fn remove_nft(env: &Env, owner: Address, category: Category, token_id: TokenId) {
+    let key = DataKey::Card(owner, category, token_id);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    env.storage().persistent().remove(&key);
 }

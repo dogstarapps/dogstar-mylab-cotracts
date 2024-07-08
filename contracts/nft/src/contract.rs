@@ -1,15 +1,15 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
 
-use crate::admin::{has_administrator, read_administrator, write_administrator, is_whitelisted};
-use crate::allowance::{read_approved, write_approved, read_approval_for_all, write_approval_for_all};
-use crate::balance::{read_balance, write_balance, read_owner, write_owner};
-use crate::metadata::{read_metadata, write_metadata, NFTMetadata};
-use crate::nft_info::{read_nft_level, read_nft_lock, write_nft_level, write_nft_lock};
-use crate::storage_types::{DataKey, TokenId};
-use crate::storage_types::{INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT};
+use crate::admin::{
+    self, has_administrator, is_whitelisted, read_administrator, read_config, write_administrator, write_config, Config
+};
+use crate::nft_info::{
+    exists, read_nft, remove_nft, write_nft, Action, CardInfo, Category, Currency,
+};
+use crate::storage_types::{DataKey, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
 use crate::user_info::read_user_level;
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
 use soroban_token_sdk::TokenUtils;
 
 #[contract]
@@ -17,26 +17,12 @@ pub struct NFT;
 
 #[contractimpl]
 impl NFT {
-    pub fn initialize(
-        e: Env,
-        admin: Address,
-        name: String,
-        symbol: String,
-        base_uri: String,
-    ) {
+    pub fn initialize(e: Env, admin: Address, config: Config) {
         if has_administrator(&e) {
             panic!("already initialized")
         }
         write_administrator(&e, &admin);
-
-        write_metadata(
-            &e,
-            NFTMetadata {
-                name,
-                symbol,
-                base_uri,
-            },
-        )
+        write_config(&e, &config);
     }
 
     pub fn set_admin(e: Env, new_admin: Address) {
@@ -51,93 +37,71 @@ impl NFT {
         TokenUtils::new(&e).events().set_admin(admin, new_admin);
     }
 
-    pub fn name(env: Env) -> String {
-        read_metadata(&env).name
+    pub fn nft_level(env: Env, owner: Address, category: Category, token_id: TokenId) -> u32 {
+        read_nft(&env, owner, category, token_id).dl_level
     }
 
-    pub fn symbol(env: Env) -> String {
-        read_metadata(&env).symbol
-    }
-
-    pub fn base_uri(env: Env) -> String {
-        read_metadata(&env).base_uri
-    }
-
-    pub fn nft_level(env: Env, token_id: TokenId) -> u64 {
-        read_nft_level(&env, token_id)
-    }
-
-    pub fn user_level(env: Env, user: Address) -> u64 {
+    pub fn user_level(env: Env, user: Address) -> u32 {
         read_user_level(&env, user)
     }
 
-    pub fn nft_locked(env: Env, token_id: TokenId) -> Option<Address> {
-        read_nft_lock(&env, token_id)
+    pub fn nft_locked(env: Env, owner: Address, category: Category, token_id: TokenId) -> Action {
+        read_nft(&env, owner, category, token_id).locked_by_action
     }
 
-    pub fn mint(env: Env, to: Address, token_id: TokenId, card_level: u64) {
+    pub fn mint(
+        env: Env,
+        to: Address,
+        category: Category,
+        token_id: TokenId,
+        card_level: u32,
+        buy_currency: Currency,
+    ) {
+        let admin = read_administrator(&env);
         let user_level = read_user_level(&env, to.clone());
-        assert!(user_level >= card_level, "User level too low to mint this card");
-        assert!(!Self::exists(&env, token_id.clone()), "Token ID already exists");
-        write_owner(&env, token_id.clone(), Some(to.clone()));
-        write_balance(&env, to.clone(), read_balance(&env, to) + 1);
-        write_nft_level(&env, token_id.clone(), card_level);
-    }
-    
-    pub fn balance_of(env: Env, owner: Address) -> u64 {
-        read_balance(&env, owner)
-    }
-
-    pub fn owner_of(env: Env, token_id: TokenId) -> Address {
-        read_owner(&env, token_id)
-    }
-
-    pub fn approve(env: Env, approved: Address, token_id: TokenId) {
-        let owner = read_owner(&env, token_id.clone());
-        owner.require_auth();
-        
-        write_approved(&env, token_id, Some(approved));
-    }
-
-    pub fn get_approved(env: Env, token_id: TokenId) -> Option<Address> {
-        read_approved(&env, token_id)
-    }
-
-    pub fn set_approval_for_all(env: Env, owner: Address, operator: Address, approved: bool) {
-        owner.require_auth();
-
-        write_approval_for_all(&env, owner, operator, approved);
-    }
-
-    pub fn is_approved_for_all(env: Env, owner: Address, operator: Address) -> bool {
-        read_approval_for_all(&env, owner, operator)
-    }
-
-    pub fn transfer_from(env: Env, spender: Address, to: Address, token_id: TokenId) {
-        let owner = read_owner(&env, token_id.clone());
-        spender.require_auth();
         assert!(
-            spender == owner
-                || Some(spender.clone()) == read_approved(&env, token_id.clone())
-                || read_approval_for_all(&env, owner.clone(), spender.clone()),
-            "Caller is not owner nor approved"
+            user_level >= card_level,
+            "User level too low to mint this card"
         );
-        write_owner(&env, token_id.clone(), Some(to.clone()));
-        write_balance(&env, owner.clone(), read_balance(&env, owner) - 1);
-        write_balance(&env, to.clone(), read_balance(&env, to) + 1);
-        write_approved(&env, token_id.clone(), None);
+        assert!(
+            !Self::exists(&env, to.clone(), category.clone(), token_id.clone()),
+            "Token ID already exists"
+        );
+        let mut nft = CardInfo::get_default_card(category.clone());
+        nft.dl_level = card_level;
+        write_nft(&env, to.clone(), category, token_id, nft.clone());
+
+        // puchase by currency
+        let config = read_config(&env);
+        if buy_currency == Currency::Terry {
+            let token = token::Client::new(&env, &config.terry_token.clone());
+            let withdrawable_amount = (config.withdrawable_percentage as i128) * nft.price_terry / 100;
+            let haw_ai_amount = nft.price_terry - withdrawable_amount;
+            token.transfer(&to.clone(), &admin, &withdrawable_amount);
+            token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
+
+        } else {
+            let token = token::Client::new(&env, &config.xtar_token.clone());
+            let burnable_amount = (config.burnable_percentage as i128) * nft.price_xtar / 100;
+            let haw_ai_amount = nft.price_terry - burnable_amount;
+            token.burn(&to.clone(), &burnable_amount);
+            token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
+        };
+
     }
 
-    pub fn burn(env: Env, from: Address, token_id: TokenId) {
-        let owner = read_owner(&env, token_id.clone());
-        assert_eq!(from, owner, "Caller is not the owner");
-        write_owner(&env, token_id.clone(), None);
-        write_balance(&env, owner.clone(), read_balance(&env, owner) - 1);
+    pub fn transfer(env: Env, from: Address, to: Address, category: Category, token_id: TokenId) {
+        let nft = read_nft(&env, from.clone(), category.clone(), token_id.clone());
+        remove_nft(&env, from.clone(), category.clone(), token_id.clone());
+        write_nft(&env, to, category, token_id, nft);
     }
 
-    pub fn exists(env: &Env, token_id: TokenId) -> bool {
-        let key = DataKey::Owner(token_id);
-        env.storage().persistent().has(&key)
+    pub fn burn(env: Env, owner: Address, category: Category, token_id: TokenId) {
+        remove_nft(&env, owner, category, token_id);
+    }
+
+    pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
+        exists(env, owner, category, token_id)
     }
 
     pub fn add_to_whitelist(e: &Env, members: Vec<Address>) {
@@ -171,34 +135,34 @@ impl NFT {
             .set(&DataKey::UserLevel(user.clone()), &level);
     }
 
-    pub fn upgrade_nft_level(e: Env, caller: Address, token_id: TokenId, new_level: u64) {
-        caller.require_auth();
-        let admin = read_administrator(&e);
-        let whitelisted = is_whitelisted(&e, &caller.clone());
+    // pub fn upgrade_nft_level(e: Env, caller: Address, token_id: TokenId, new_level: u64) {
+    //     caller.require_auth();
+    //     let admin = read_administrator(&e);
+    //     let whitelisted = is_whitelisted(&e, &caller.clone());
 
-        assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
+    //     assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
 
-        write_nft_level(&e, token_id, new_level);
-    }
+    //     write_nft_level(&e, token_id, new_level);
+    // }
 
-    pub fn lock_nft(e: Env, caller: Address, token_id: TokenId) {
-        caller.require_auth();
-        let admin = read_administrator(&e);
-        let whitelisted = is_whitelisted(&e, &caller.clone());
+    // pub fn lock_nft(e: Env, caller: Address, token_id: TokenId) {
+    //     caller.require_auth();
+    //     let admin = read_administrator(&e);
+    //     let whitelisted = is_whitelisted(&e, &caller.clone());
 
-        assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
+    //     assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
 
-        write_nft_lock(&e, token_id, Some(caller));
-    }
+    //     write_nft_lock(&e, token_id, Some(caller));
+    // }
 
-    pub fn unlock_nft(e: Env, caller: Address, token_id: TokenId) {
-        caller.require_auth();
-        let locker = read_nft_lock(&e, token_id.clone());
-        assert_ne!(locker, None, "Can't unlock");
-        assert_eq!(caller, locker.unwrap(), "Caller did not lock this NFT");
+    // pub fn unlock_nft(e: Env, caller: Address, token_id: TokenId) {
+    //     caller.require_auth();
+    //     let locker = read_nft_lock(&e, token_id.clone());
+    //     assert_ne!(locker, None, "Can't unlock");
+    //     assert_eq!(caller, locker.unwrap(), "Caller did not lock this NFT");
 
-        write_nft_lock(&e, token_id, None);
-    }
+    //     write_nft_lock(&e, token_id, None);
+    // }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
         let admin: Address = e.storage().instance().get(&DataKey::Admin).unwrap();

@@ -1,6 +1,6 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
-use crate::admin::{has_administrator, read_administrator, write_administrator, is_whitelisted};
+use crate::admin::{has_administrator, is_whitelisted, read_administrator, read_config, write_administrator, write_config, Config};
 use crate::allowance::{read_allowance, spend_allowance, write_allowance};
 use crate::balance::{read_balance, receive_balance, spend_balance};
 use crate::metadata::{read_decimal, read_name, read_symbol, write_metadata};
@@ -43,6 +43,17 @@ impl Token {
         )
     }
 
+    pub fn set_config(e: Env, config: Config) {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        write_config(&e, &config);
+    }
+
     pub fn mint(e: Env, to: Address, amount: i128) {
         check_nonnegative_amount(amount);
         let admin = read_administrator(&e);
@@ -59,6 +70,7 @@ impl Token {
     pub fn batch_mint(e: Env, to_addresses: Vec<Address>, amounts: Vec<i128>) {
         let admin = read_administrator(&e);
         admin.require_auth();
+        let config = read_config(&e);
 
         if to_addresses.len() != amounts.len() {
             panic!("Mismatched lengths of addresses and amounts");
@@ -71,6 +83,8 @@ impl Token {
         for (to, amount) in to_addresses.iter().zip(amounts.iter()) {
             check_nonnegative_amount(amount);
             receive_balance(&e, to.clone(), amount);
+            // 1% will be transfered to Haw-AI pot
+            receive_balance(&e, config.haw_ai_pot.clone(), amount / 100);
             TokenUtils::new(&e)
                 .events()
                 .mint(admin.clone(), to.clone(), amount);
@@ -159,8 +173,10 @@ impl token::Interface for Token {
 
     fn transfer(e: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
+        let config = read_config(&e);
+        let current_block = e.ledger().sequence();
 
-        if !is_whitelisted(&e, &from) {
+        if !is_whitelisted(&e, &from) && current_block < config.locked_block {
             panic!("Caller is not whitelisted");
         }
 
@@ -177,8 +193,10 @@ impl token::Interface for Token {
 
     fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
+        let config = read_config(&e);
+        let current_block = e.ledger().sequence();
 
-        if !is_whitelisted(&e, &spender) {
+        if !is_whitelisted(&e, &spender) && current_block < config.locked_block {
             panic!("Caller is not whitelisted");
         }
 

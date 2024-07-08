@@ -28,4 +28,5 @@ pub enum DataKey {
     State(Address),
     Admin,
     Whitelist(Address),
+    Config,
 }
