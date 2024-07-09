@@ -9,7 +9,7 @@ pub(crate) const INSTANCE_LIFETIME_THRESHOLD: u32 = INSTANCE_BUMP_AMOUNT - DAY_I
 pub(crate) const BALANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub(crate) const BALANCE_LIFETIME_THRESHOLD: u32 = BALANCE_BUMP_AMOUNT - DAY_IN_LEDGERS;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[contracttype]
 pub struct TokenId(pub u32);
 
@@ -18,7 +18,12 @@ pub struct TokenId(pub u32);
 pub enum DataKey {
     Admin,
     Config,
+    Balance,
     Whitelist(Address),
     UserLevel(Address),
     Card(Address, Category, TokenId),
+    Stake(Address, Category, TokenId),
+    Deck(Address),
+    Lendings,
+    Lending(Address, Category, TokenId),
 }

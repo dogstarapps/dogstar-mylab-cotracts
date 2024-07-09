@@ -2,10 +2,10 @@
 //! interface.
 
 use crate::admin::{
-    self, has_administrator, is_whitelisted, read_administrator, read_config, write_administrator, write_config, Config
+    has_administrator, read_administrator, read_balance, read_config, write_administrator, write_balance, write_config, Balance, Config
 };
 use crate::nft_info::{
-    exists, read_nft, remove_nft, write_nft, Action, CardInfo, Category, Currency,
+    exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency
 };
 use crate::storage_types::{DataKey, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
 use crate::user_info::read_user_level;
@@ -23,6 +23,14 @@ impl NFT {
         }
         write_administrator(&e, &admin);
         write_config(&e, &config);
+        write_balance(&e, &Balance {
+            admin_power: 0,
+            admin_terry: 0,
+            haw_ai_power: 0,
+            haw_ai_terry: 0,
+            haw_ai_xtar: 0,
+            total_deck_power: 0,
+        });
     }
 
     pub fn set_admin(e: Env, new_admin: Address) {
@@ -57,6 +65,7 @@ impl NFT {
         card_level: u32,
         buy_currency: Currency,
     ) {
+        to.require_auth();
         let admin = read_administrator(&env);
         let user_level = read_user_level(&env, to.clone());
         assert!(
@@ -67,37 +76,44 @@ impl NFT {
             !Self::exists(&env, to.clone(), category.clone(), token_id.clone()),
             "Token ID already exists"
         );
-        let mut nft = CardInfo::get_default_card(category.clone());
-        nft.dl_level = card_level;
+        let card_info = CardInfo::get_default_card(category.clone());
+        let nft = Card {
+            power: card_info.initial_power,
+            dl_level: card_level,
+            locked_by_action: Action::None,
+        };
         write_nft(&env, to.clone(), category, token_id, nft.clone());
 
         // puchase by currency
         let config = read_config(&env);
+        let mut balance = read_balance(&env);
         if buy_currency == Currency::Terry {
             let token = token::Client::new(&env, &config.terry_token.clone());
-            let withdrawable_amount = (config.withdrawable_percentage as i128) * nft.price_terry / 100;
-            let haw_ai_amount = nft.price_terry - withdrawable_amount;
+            let withdrawable_amount = (config.withdrawable_percentage as i128) * card_info.price_terry / 100;
+            let haw_ai_amount = card_info.price_terry - withdrawable_amount;
+            // 50% of terry price to the admin and 50% to the haw ai pot
             token.transfer(&to.clone(), &admin, &withdrawable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
-
+            balance.admin_terry += withdrawable_amount;
+            balance.haw_ai_terry += haw_ai_amount;
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
-            let burnable_amount = (config.burnable_percentage as i128) * nft.price_xtar / 100;
-            let haw_ai_amount = nft.price_terry - burnable_amount;
+            let burnable_amount = (config.burnable_percentage as i128) * card_info.price_xtar / 100;
+            let haw_ai_amount = card_info.price_terry - burnable_amount;
+            // 50% of xtar price to burn and 50% to the haw ai pot
             token.burn(&to.clone(), &burnable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
+            balance.haw_ai_xtar += haw_ai_amount;
         };
 
+        write_balance(&env, &balance);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, category: Category, token_id: TokenId) {
+        from.require_auth();
         let nft = read_nft(&env, from.clone(), category.clone(), token_id.clone());
         remove_nft(&env, from.clone(), category.clone(), token_id.clone());
         write_nft(&env, to, category, token_id, nft);
-    }
-
-    pub fn burn(env: Env, owner: Address, category: Category, token_id: TokenId) {
-        remove_nft(&env, owner, category, token_id);
     }
 
     pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
