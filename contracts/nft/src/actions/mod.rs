@@ -9,3 +9,6 @@ pub use deck::*;
 
 pub mod lending;
 pub use lending::*;
+
+pub mod fight;
+pub use fight::*;

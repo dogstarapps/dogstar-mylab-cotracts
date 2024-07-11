@@ -630,7 +630,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'insufficient balance' from contract function 'Symbol(transfer)'"
+                  "string": "caught panic 'called `Option::unwrap()` on a `None` value' from contract function 'Symbol(transfer)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

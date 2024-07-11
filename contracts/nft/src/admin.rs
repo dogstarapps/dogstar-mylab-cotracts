@@ -1,13 +1,13 @@
-use soroban_sdk::{contracttype, Address, Env, Vec};
-use soroban_sdk::token::StellarAssetClient as TokenAdminClient;
-
 use crate::storage_types::DataKey;
+use soroban_sdk::token::StellarAssetClient;
+use soroban_sdk::{contracttype, Address, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     pub terry_token: Address,
     pub xtar_token: Address,
+    pub oracle_contract_id: Address,
     pub haw_ai_pot: Address,
     pub withdrawable_percentage: u32,
     pub burnable_percentage: u32,
@@ -54,9 +54,7 @@ pub fn is_whitelisted(e: &Env, member: &Address) -> bool {
 
 pub fn write_config(e: &Env, config: &Config) {
     let key = DataKey::Config;
-    e.storage()
-        .persistent()
-        .set(&key, config);
+    e.storage().persistent().set(&key, config);
 }
 
 pub fn read_config(e: &Env) -> Config {
@@ -66,18 +64,28 @@ pub fn read_config(e: &Env) -> Config {
 
 pub fn write_balance(e: &Env, balance: &Balance) {
     let key = DataKey::Balance;
-    e.storage()
-        .persistent()
-        .set(&key, balance);
+    e.storage().persistent().set(&key, balance);
 }
 
 pub fn read_balance(e: &Env) -> Balance {
     let key = DataKey::Balance;
-    e.storage().persistent().get(&key).unwrap()
+    e.storage().persistent().get(&key).unwrap_or(Balance {
+        admin_terry: 0,
+        admin_power: 0,
+        haw_ai_terry: 0,
+        haw_ai_power: 0,
+        haw_ai_xtar: 0,
+        total_deck_power: 0,
+    })
 }
 
 pub fn mint_terry(e: &Env, to: Address, amount: i128) {
     let config = read_config(&e);
-    let token_admin_client = TokenAdminClient::new(&e, &config.terry_token);
+    let token_admin_client = StellarAssetClient::new(&e, &config.terry_token);
+    token_admin_client.mint(&to, &amount);
+}
+
+pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
+    let token_admin_client = StellarAssetClient::new(&e, &token);
     token_admin_client.mint(&to, &amount);
 }

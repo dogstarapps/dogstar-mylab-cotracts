@@ -50,8 +50,8 @@ pub struct CardInfo {
 impl CardInfo {
     pub fn get_default_card(category: Category) -> Self {
         Self {
-            initial_power: 0,
-            max_power: 100,
+            initial_power: 1000,
+            max_power: 10000,
             price_terry: 100,
             price_xtar: 100,
         }
@@ -76,10 +76,7 @@ pub fn read_nft(env: &Env, owner: Address, category: Category, token_id: TokenId
 
 pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
     let key = DataKey::Card(owner, category, token_id);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-    env.storage().persistent().has(&key)
+    env.storage().persistent().has(&key)    
 }
 
 pub fn remove_nft(env: &Env, owner: Address, category: Category, token_id: TokenId) {

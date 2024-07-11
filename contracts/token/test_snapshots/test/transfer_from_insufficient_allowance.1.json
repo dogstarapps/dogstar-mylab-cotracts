@@ -955,7 +955,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'insufficient allowance' from contract function 'Symbol(obj#125)'"
+                  "string": "caught panic 'called `Option::unwrap()` on a `None` value' from contract function 'Symbol(obj#125)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

@@ -1,15 +1,18 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
 
+use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    has_administrator, read_administrator, read_balance, read_config, write_administrator, write_balance, write_config, Balance, Config
+    has_administrator, mint_terry, mint_token, read_administrator, read_balance, read_config,
+    write_administrator, write_balance, write_config, Balance, Config,
 };
 use crate::nft_info::{
-    exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency
+    exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
 };
 use crate::storage_types::{DataKey, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
-use crate::user_info::read_user_level;
-use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
+use crate::user_info::{read_user, write_user};
+use soroban_sdk::Vec;
+pub use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
 use soroban_token_sdk::TokenUtils;
 
 #[contract]
@@ -23,38 +26,17 @@ impl NFT {
         }
         write_administrator(&e, &admin);
         write_config(&e, &config);
-        write_balance(&e, &Balance {
-            admin_power: 0,
-            admin_terry: 0,
-            haw_ai_power: 0,
-            haw_ai_terry: 0,
-            haw_ai_xtar: 0,
-            total_deck_power: 0,
-        });
-    }
-
-    pub fn set_admin(e: Env, new_admin: Address) {
-        let admin = read_administrator(&e);
-        admin.require_auth();
-
-        e.storage()
-            .instance()
-            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
-
-        write_administrator(&e, &new_admin);
-        TokenUtils::new(&e).events().set_admin(admin, new_admin);
-    }
-
-    pub fn nft_level(env: Env, owner: Address, category: Category, token_id: TokenId) -> u32 {
-        read_nft(&env, owner, category, token_id).dl_level
-    }
-
-    pub fn user_level(env: Env, user: Address) -> u32 {
-        read_user_level(&env, user)
-    }
-
-    pub fn nft_locked(env: Env, owner: Address, category: Category, token_id: TokenId) -> Action {
-        read_nft(&env, owner, category, token_id).locked_by_action
+        write_balance(
+            &e,
+            &Balance {
+                admin_power: 0,
+                admin_terry: 0,
+                haw_ai_power: 0,
+                haw_ai_terry: 0,
+                haw_ai_xtar: 0,
+                total_deck_power: 0,
+            },
+        );
     }
 
     pub fn mint(
@@ -67,7 +49,7 @@ impl NFT {
     ) {
         to.require_auth();
         let admin = read_administrator(&env);
-        let user_level = read_user_level(&env, to.clone());
+        let user_level = read_user(&env, to.clone()).level;
         assert!(
             user_level >= card_level,
             "User level too low to mint this card"
@@ -89,7 +71,8 @@ impl NFT {
         let mut balance = read_balance(&env);
         if buy_currency == Currency::Terry {
             let token = token::Client::new(&env, &config.terry_token.clone());
-            let withdrawable_amount = (config.withdrawable_percentage as i128) * card_info.price_terry / 100;
+            let withdrawable_amount =
+                (config.withdrawable_percentage as i128) * card_info.price_terry / 100;
             let haw_ai_amount = card_info.price_terry - withdrawable_amount;
             // 50% of terry price to the admin and 50% to the haw ai pot
             token.transfer(&to.clone(), &admin, &withdrawable_amount);
@@ -116,8 +99,37 @@ impl NFT {
         write_nft(&env, to, category, token_id, nft);
     }
 
-    pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
-        exists(env, owner, category, token_id)
+    pub fn burn(env: Env, owner: Address, category: Category, token_id: TokenId) {
+        burn::burn(env, owner, category, token_id)
+    }
+
+    pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
+        let admin: Address = e.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+
+        e.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
+    pub fn set_user_level(e: Env, user: Address, level: u32) {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+
+        let mut user_info = read_user(&e, user.clone());
+        user_info.level = level;
+
+        write_user(&e, user.clone(), user_info);
+    }
+
+    pub fn set_admin(e: Env, new_admin: Address) {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        write_administrator(&e, &new_admin);
+        TokenUtils::new(&e).events().set_admin(admin, new_admin);
     }
 
     pub fn add_to_whitelist(e: &Env, members: Vec<Address>) {
@@ -142,48 +154,176 @@ impl NFT {
         }
     }
 
-    pub fn set_user_level(e: Env, user: Address, level: u64) {
-        let admin = read_administrator(&e);
-        admin.require_auth();
-
-        e.storage()
-            .persistent()
-            .set(&DataKey::UserLevel(user.clone()), &level);
+    pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
+        exists(env, owner, category, token_id)
     }
 
-    // pub fn upgrade_nft_level(e: Env, caller: Address, token_id: TokenId, new_level: u64) {
-    //     caller.require_auth();
-    //     let admin = read_administrator(&e);
-    //     let whitelisted = is_whitelisted(&e, &caller.clone());
+    pub fn admin_balance(env: &Env) -> Balance {
+        read_balance(&env)
+    }
 
-    //     assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
+    pub fn card(env: Env, owner: Address, category: Category, token_id: TokenId) -> Card {
+        read_nft(&env, owner, category, token_id)
+    }
 
-    //     write_nft_level(&e, token_id, new_level);
-    // }
+    pub fn mint_terry(env: Env, to: Address, amount: i128) {
+        mint_terry(&env, to, amount)
+    }
 
-    // pub fn lock_nft(e: Env, caller: Address, token_id: TokenId) {
-    //     caller.require_auth();
-    //     let admin = read_administrator(&e);
-    //     let whitelisted = is_whitelisted(&e, &caller.clone());
+    pub fn mint_token(env: Env, token: Address, to: Address, amount: i128) {
+        mint_token(&env, token, to, amount)
+    }
 
-    //     assert!(caller == admin || whitelisted, "Caller is not admin or whitelisted");
+    pub fn config(env: Env) -> Config {
+        read_config(&env)
+    }
+}
 
-    //     write_nft_lock(&e, token_id, Some(caller));
-    // }
+// Stake
+#[contractimpl]
+impl NFT {
+    pub fn stake(
+        env: Env,
+        owner: Address,
+        category: Category,
+        token_id: TokenId,
+        stake_power: u32,
+        period_index: u32,
+    ) {
+        stake::stake(env, owner, category, token_id, stake_power, period_index)
+    }
 
-    // pub fn unlock_nft(e: Env, caller: Address, token_id: TokenId) {
-    //     caller.require_auth();
-    //     let locker = read_nft_lock(&e, token_id.clone());
-    //     assert_ne!(locker, None, "Can't unlock");
-    //     assert_eq!(caller, locker.unwrap(), "Caller did not lock this NFT");
+    pub fn increase_stake_power(
+        env: Env,
+        owner: Address,
+        category: Category,
+        token_id: TokenId,
+        increase_power: u32,
+    ) {
+        stake::increase_stake_power(env, owner, category, token_id, increase_power)
+    }
 
-    //     write_nft_lock(&e, token_id, None);
-    // }
+    pub fn unstake(env: Env, owner: Address, category: Category, token_id: TokenId) {
+        stake::unstake(env, owner, category, token_id)
+    }
 
-    pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
-        let admin: Address = e.storage().instance().get(&DataKey::Admin).unwrap();
-        admin.require_auth();
+    pub fn read_stake(
+        env: &Env,
+        owner: Address,
+        category: Category,
+        token_id: TokenId,
+    ) -> stake::Stake {
+        stake::read_stake(env, owner, category, token_id)
+    }
+}
 
-        e.deployer().update_current_contract_wasm(new_wasm_hash);
+// Fight
+#[contractimpl]
+impl NFT {
+    pub fn open_position(
+        env: Env,
+        owner: Address,
+        category: Category,
+        token_id: TokenId,
+        currency: fight::Currency,
+        side_position: SidePosition,
+        leverage: u32,
+    ) {
+        fight::open_position(
+            env,
+            owner,
+            category,
+            token_id,
+            currency,
+            side_position,
+            leverage,
+        )
+    }
+
+    pub fn close_position(env: Env, owner: Address, category: Category, token_id: TokenId) {
+        fight::close_position(env, owner, category, token_id)
+    }
+}
+
+// Lend & Borrow
+#[contractimpl]
+impl NFT {
+    pub fn lend(
+        env: Env,
+        owner: Address,
+        category: Category,
+        token_id: TokenId,
+        power: u32,
+        interest_rate: u32,
+        duration: u32,
+    ) {
+        lending::lend(
+            env,
+            owner,
+            category,
+            token_id,
+            power,
+            interest_rate,
+            duration,
+        )
+    }
+
+    pub fn borrow(
+        env: Env,
+        borrower: Address,
+        lender: Address,
+        category: Category,
+        token_id: TokenId,
+        collateral_category: Category,
+        collateral_token_id: TokenId,
+    ) {
+        lending::borrow(
+            env,
+            borrower,
+            lender,
+            category,
+            token_id,
+            collateral_category,
+            collateral_token_id,
+        )
+    }
+
+    pub fn repay(
+        env: Env,
+        borrower: Address,
+        lender: Address,
+        category: Category,
+        token_id: TokenId,
+    ) {
+        lending::repay(env, borrower, lender, category, token_id)
+    }
+
+    pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
+        lending::withdraw(env, lender, category, token_id)
+    }
+}
+
+// Deck
+#[contractimpl]
+impl NFT {
+    pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
+        deck::place(env, owner, categories, token_ids)
+    }
+
+    pub fn update_place(
+        env: Env,
+        owner: Address,
+        categories: Vec<Category>,
+        token_ids: Vec<TokenId>,
+    ) {
+        deck::update_place(env, owner, categories, token_ids)
+    }
+
+    pub fn remove_place(env: Env, owner: Address) {
+        deck::remove_deck(env, owner)
+    }
+
+    pub fn read_deck(env: Env, owner: Address) -> Deck {
+        deck::read_deck(env, owner)
     }
 }
