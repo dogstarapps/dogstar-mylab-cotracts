@@ -224,16 +224,10 @@ pub fn update_haw_ai_percentages(env: Env) {
     let balance = read_balance(&env);
 
     for mut deck in decks {
-        let haw_ai_percentage = ((deck.total_power as f32) * (100 as f32)
-            / (balance.total_deck_power as f32)
-            * (1.0 + deck.bonus as f32 / 100.0)) as u32;
+        let haw_ai_percentage = (deck.total_power * (100 + deck.bonus) / balance.total_deck_power);
 
         deck.haw_ai_percentage = haw_ai_percentage;
 
-        write_deck(
-            env.clone(),
-            deck.owner.clone(),
-            deck,
-        );
+        write_deck(env.clone(), deck.owner.clone(), deck);
     }
 }

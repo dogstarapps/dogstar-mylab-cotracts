@@ -251,8 +251,8 @@ pub fn repay(env: Env, borrower: Address, lender: Address, category: Category, t
     );
     let current_block = env.ledger().sequence();
     let time_elapsed = current_block - lending.borrowed_block;
-    let interest_amount = ((lending.power * lending.interest_rate * time_elapsed * 100) as f32
-        / lending.duration as f32) as u32;
+    let interest_amount =
+        lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
 
     let mut lender_nft = read_nft(
         &env.clone(),
@@ -319,8 +319,8 @@ pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId
     if lending.is_borrowed {
         let current_block = env.ledger().sequence();
         let time_elapsed = current_block - lending.borrowed_block;
-        let interest_amount = ((lending.power * lending.interest_rate * time_elapsed * 100) as f32
-            / lending.duration as f32) as u32;
+        let interest_amount =
+            lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
 
         let mut lender_nft = read_nft(
             &env.clone(),

@@ -1,7 +1,7 @@
 #![cfg(test)]
 extern crate std;
 
-use crate::{contract::Token, TokenClient};
+use crate::{admin::Config, contract::Token, TokenClient};
 use soroban_sdk::{
     symbol_short, testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation}, vec, Address, Env, IntoVal, Symbol
 };
@@ -24,6 +24,10 @@ fn test() {
     let user3 = Address::generate(&e);
     let token = create_token(&e, &admin1);
 
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin1.clone()
+    });
     let members = vec![&e, user1.clone(), user2.clone(), user3.clone()];
     token.add_to_whitelist( &members);
 
@@ -149,6 +153,10 @@ fn test_batch_mint() {
     let user3 = Address::generate(&e);
     let token = create_token(&e, &admin1);
 
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin1.clone()
+    });
     // Create Vec<Address> for to_addresses
     let to_addresses = vec![&e, user1.clone(), user2.clone(), user3.clone()];
 
@@ -174,6 +182,11 @@ fn test_burn() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let token = create_token(&e, &admin);
+
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin.clone()
+    });
 
     token.mint(&user1, &1000);
     assert_eq!(token.balance(&user1), 1000);
@@ -232,6 +245,11 @@ fn transfer_insufficient_balance() {
     let user2 = Address::generate(&e);
     let token = create_token(&e, &admin);
 
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin.clone()
+    });
+
     token.mint(&user1, &1000);
     assert_eq!(token.balance(&user1), 1000);
 
@@ -250,6 +268,11 @@ fn transfer_from_insufficient_allowance() {
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let token = create_token(&e, &admin);
+
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin.clone()
+    });
 
     token.mint(&user1, &1000);
     assert_eq!(token.balance(&user1), 1000);
@@ -291,6 +314,11 @@ fn test_zero_allowance() {
     let spender = Address::generate(&e);
     let from = Address::generate(&e);
     let token = create_token(&e, &admin);
+
+    token.set_config(&Config {
+        locked_block: 0,
+        haw_ai_pot: admin.clone()
+    });
 
     token.add_to_whitelist(&vec![&e.clone(), spender.clone()]);
     token.transfer_from(&spender, &from, &spender, &0);
