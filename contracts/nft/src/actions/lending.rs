@@ -1,5 +1,5 @@
 use crate::*;
-use admin::read_config;
+use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -189,6 +189,10 @@ pub fn borrow(
 
     let config = read_config(&env);
     let power_fee = config.power_action_fee * lending.power / 100;
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_power += power_fee;
+    write_balance(&env, &balance);
 
     borrower_nft.locked_by_action = Action::Borrow;
     borrower_nft.power += lending.power;

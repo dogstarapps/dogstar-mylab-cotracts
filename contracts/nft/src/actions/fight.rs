@@ -1,5 +1,5 @@
 use crate::*;
-use admin::read_config;
+use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -137,6 +137,10 @@ pub fn open_position(
 
     nft.power -= power_fee;
 
+    let mut balance = read_balance(&env);
+    balance.haw_ai_power += power_fee;
+    write_balance(&env, &balance);
+
     write_nft(
         &env,
         owner.clone(),
@@ -182,11 +186,11 @@ pub fn close_position(env: Env, owner: Address, category: Category, token_id: To
         * if fight.trigger_price == 0 {
             0
         } else {
-            ((if fight.side_position == SidePosition::Long {
+            (if fight.side_position == SidePosition::Long {
                 current_price - fight.trigger_price
             } else {
                 fight.trigger_price - current_price
-            } / fight.trigger_price) as i32)
+            } / fight.trigger_price) as i32
         }
         * fight.leverage as i32
         / 100;
