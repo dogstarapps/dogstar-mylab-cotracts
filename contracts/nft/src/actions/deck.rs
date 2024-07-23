@@ -224,7 +224,7 @@ pub fn update_haw_ai_percentages(env: Env) {
     let balance = read_balance(&env);
 
     for mut deck in decks {
-        let haw_ai_percentage = (deck.total_power * (100 + deck.bonus) / balance.total_deck_power);
+        let haw_ai_percentage = deck.total_power * (100 + deck.bonus) / balance.total_deck_power;
 
         deck.haw_ai_percentage = haw_ai_percentage;
 

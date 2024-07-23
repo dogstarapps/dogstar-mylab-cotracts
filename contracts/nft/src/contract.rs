@@ -243,6 +243,10 @@ impl NFT {
     pub fn close_position(env: Env, owner: Address, category: Category, token_id: TokenId) {
         fight::close_position(env, owner, category, token_id)
     }
+
+    pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
+        fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
+    }
 }
 
 // Lend & Borrow

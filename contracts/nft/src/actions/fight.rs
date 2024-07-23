@@ -1,8 +1,22 @@
 use crate::*;
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Vec};
+use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Val, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Asset {
+    Stellar(Address),
+    Other(Symbol),
+}
+
+//price record definition
+#[contracttype]
+pub struct PriceData {
+    price: i128,     //asset price at given point in time
+    timestamp: u64   //recording timestamp
+}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,7 +83,7 @@ pub fn remove_fight(env: Env, owner: Address, category: Category, token_id: Toke
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
 
-    if (env.storage().persistent().has(&key)) {
+    if env.storage().persistent().has(&key) {
         env.storage().persistent().extend_ttl(
             &key,
             BALANCE_LIFETIME_THRESHOLD,
@@ -100,22 +114,25 @@ pub fn read_fights(env: Env) -> Vec<Fight> {
         .unwrap_or(vec![&env.clone()])
 }
 
-pub fn get_currency_price(env: Env, currency: Currency) -> i128 {
-    let config = read_config(&env);
-    let asset_symbol = match currency {
-        Currency::BTC => Symbol::new(&env, "BTC"),
-        Currency::ETH => Symbol::new(&env, "ETH"),
-        Currency::XLM => Symbol::new(&env, "XLM"),
-        Currency::SOL => Symbol::new(&env, "SOL"),
+pub fn get_currency_price(env: Env, oracle_contract_id: Address, currency: Currency) -> i128 {
+    // let config = read_config(&env);
+    let asset = match currency {
+        Currency::BTC => Asset::Other(Symbol::new(&env, "BTC")),
+        Currency::ETH => Asset::Other(Symbol::new(&env, "ETH")),
+        Currency::XLM => Asset::Stellar(oracle_contract_id.clone()),
+        Currency::SOL => Asset::Other(Symbol::new(&env, "SOL")),
     };
-    // let asset = (asset_symbol.clone(),).into_val(&env);
-    // let function_symbol = Symbol::new(&env, "lastprice");
+    let args: Vec<Val> = (asset.clone(),).into_val(&env);
+    let function_symbol = Symbol::new(&env, "lastprice");
 
-    // let asset_price: i128 =
-    //     env.invoke_contract(&config.oracle_contract_id, &function_symbol, asset);
+    let asset_price: Option<PriceData> = 
+        env.invoke_contract(&oracle_contract_id, &function_symbol, args);
 
-    // asset_price
-    0
+    if let Some( asset_price) = asset_price {
+        asset_price.price
+    } else {
+        0
+    }
 }
 
 pub fn open_position(
@@ -150,7 +167,8 @@ pub fn open_position(
     );
 
     // get currency price from oracle
-    let trigger_price = get_currency_price(env.clone(), currency.clone());
+    let config = read_config(&env.clone());
+    let trigger_price = get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
 
     write_fight(
         env.clone(),
@@ -181,7 +199,8 @@ pub fn close_position(env: Env, owner: Address, category: Category, token_id: To
         token_id.clone(),
     );
 
-    let current_price = get_currency_price(env.clone(), fight.currency);
+    let config = read_config(&env.clone());
+    let current_price = get_currency_price(env.clone(), config.oracle_contract_id, fight.currency);
     let power = fight.power as i32
         * if fight.trigger_price == 0 {
             0

@@ -9,7 +9,7 @@ use crate::{
     storage_types::TokenId,
     NFTClient,
 };
-use soroban_sdk::token::{StellarAssetClient, TokenClient};
+use soroban_sdk::{token::{StellarAssetClient, TokenClient}, String};
 use soroban_sdk::{testutils::Address as _, vec, Address, Env};
 
 fn create_nft<'a>(e: &Env, admin: &Address, config: &Config) -> NFTClient<'a> {
@@ -447,4 +447,23 @@ fn test_burn() {
     // Burn
     nft.burn(&user1, &Category::Leader, &TokenId(1));
     assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
+}
+
+#[test]
+fn test_currency_price() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin1 = Address::generate(&e);
+    // let user1 = Address::generate(&e);
+
+    // Generate config
+    let mut config = generate_config(&e);
+
+    config.oracle_contract_id = Address::from_string(&String::from_str(&e, "CBKZFI26PDCZUJ5HYYKVB5BWCNYUSNA5LVL4R2JTRVSOB4XEP7Y34OPN"));
+    
+    let nft = create_nft(&e, &admin1, &config);
+
+    let price = nft.currency_price(&fight::Currency::BTC);
+    assert!(price == 0);
 }
