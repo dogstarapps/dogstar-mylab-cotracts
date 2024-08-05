@@ -10,7 +10,7 @@ use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
 };
 use crate::storage_types::{DataKey, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
-use crate::user_info::{read_user, write_user};
+use crate::user_info::{read_user, read_user_by_fee_payer, write_user};
 use soroban_sdk::Vec;
 pub use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
 use soroban_token_sdk::TokenUtils;
@@ -41,15 +41,18 @@ impl NFT {
 
     pub fn mint(
         env: Env,
-        to: Address,
+        fee_payer: Address,
         category: Category,
         token_id: TokenId,
         card_level: u32,
         buy_currency: Currency,
     ) {
-        to.require_auth();
+        fee_payer.require_auth();
         let admin = read_administrator(&env);
-        let user_level = read_user(&env, to.clone()).level;
+        let user = read_user_by_fee_payer(e, fee_payer);
+        let user_level = user.level; 
+        let to :Address = user.owner; 
+        //let user_level = read_user(&env, to.clone()).level;
         assert!(
             user_level >= card_level,
             "User level too low to mint this card"
@@ -67,7 +70,7 @@ impl NFT {
         write_nft(&env, to.clone(), category, token_id, nft.clone());
 
         // puchase by currency
-        let config = read_config(&env);
+        let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
         if buy_currency == Currency::Terry {
             let token = token::Client::new(&env, &config.terry_token.clone());
@@ -99,8 +102,8 @@ impl NFT {
         write_nft(&env, to, category, token_id, nft);
     }
 
-    pub fn burn(env: Env, owner: Address, category: Category, token_id: TokenId) {
-        burn::burn(env, owner, category, token_id)
+    pub fn burn(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+        burn::burn(env, fee_payer, category, token_id)
     }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
@@ -184,36 +187,36 @@ impl NFT {
 impl NFT {
     pub fn stake(
         env: Env,
-        owner: Address,
+        fee_payer: Address,
         category: Category,
         token_id: TokenId,
         stake_power: u32,
         period_index: u32,
     ) {
-        stake::stake(env, owner, category, token_id, stake_power, period_index)
+        stake::stake(env, fee_payer, category, token_id, stake_power, period_index)
     }
 
     pub fn increase_stake_power(
         env: Env,
-        owner: Address,
+        fee_payer: Address,
         category: Category,
         token_id: TokenId,
         increase_power: u32,
     ) {
-        stake::increase_stake_power(env, owner, category, token_id, increase_power)
+        stake::increase_stake_power(env, fee_payer, category, token_id, increase_power)
     }
 
-    pub fn unstake(env: Env, owner: Address, category: Category, token_id: TokenId) {
-        stake::unstake(env, owner, category, token_id)
+    pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+        stake::unstake(env, fee_payer, category, token_id)
     }
 
     pub fn read_stake(
         env: &Env,
-        owner: Address,
+        fee_payer: Address,
         category: Category,
         token_id: TokenId,
     ) -> stake::Stake {
-        stake::read_stake(env, owner, category, token_id)
+        stake::read_stake(env, fee_payer, category, token_id)
     }
 }
 

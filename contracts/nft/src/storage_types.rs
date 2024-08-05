@@ -13,6 +13,13 @@ pub(crate) const BALANCE_LIFETIME_THRESHOLD: u32 = BALANCE_BUMP_AMOUNT - DAY_IN_
 #[contracttype]
 pub struct TokenId(pub u32);
 
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct Level {
+    pub minimum_terry: u32,
+    pub maximum_terry: u32,
+    pub name: string,
+}
 #[derive(Clone)]
 #[contracttype]
 pub enum DataKey {
@@ -30,4 +37,6 @@ pub enum DataKey {
     Lending(Address, Category, TokenId),
     Fights,
     Fight(Address, Category, TokenId),
+    Level(u8),
+    LevelId, 
 }

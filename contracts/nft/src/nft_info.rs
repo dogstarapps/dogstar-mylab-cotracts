@@ -75,7 +75,7 @@ pub fn read_nft(env: &Env, owner: Address, category: Category, token_id: TokenId
 }
 
 pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
-    let key = DataKey::Card(owner, category, token_id);
+    let key: DataKey = DataKey::Card(owner, category, token_id);
     env.storage().persistent().has(&key)    
 }
 

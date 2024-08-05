@@ -23,11 +23,14 @@ pub struct Lending {
 
 pub fn write_lending(
     env: Env,
-    owner: Address,
+    fee_payer: Address,
     category: Category,
     token_id: TokenId,
     lending: Lending,
 ) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &lending);
     env.storage()
@@ -51,7 +54,10 @@ pub fn write_lending(
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_lending(env: Env, owner: Address, category: Category, token_id: TokenId) -> Lending {
+pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Lending {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage()
         .persistent()
@@ -59,7 +65,10 @@ pub fn read_lending(env: Env, owner: Address, category: Category, token_id: Toke
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_lending(env: Env, owner: Address, category: Category, token_id: TokenId) {
+pub fn remove_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
     if env.storage().persistent().has(&key) {
@@ -95,14 +104,15 @@ pub fn read_lendings(env: Env) -> Vec<Lending> {
 
 pub fn lend(
     env: Env,
-    owner: Address,
+    fee_payer: Address,
     category: Category,
     token_id: TokenId,
     power: u32,
     interest_rate: u32,
     duration: u32,
 ) {
-    owner.require_auth();
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
 
     assert!(category == Category::Human, "Invalid Category to lend");
 
@@ -153,14 +163,16 @@ pub fn lend(
 
 pub fn borrow(
     env: Env,
-    borrower: Address,
+    fee_payer: Address,
     lender: Address,
     category: Category,
     token_id: TokenId,
     collateral_category: Category,
     collateral_token_id: TokenId,
 ) {
-    borrower.require_auth();
+    fee_payer.require_auth();
+    let borrower = read_user_by_fee_payer(e, fee_payer).owner;
+
 
     let mut borrower_nft = read_nft(
         &env.clone(),
@@ -195,12 +207,15 @@ pub fn borrow(
     write_balance(&env, &balance);
 
     borrower_nft.locked_by_action = Action::Borrow;
-    borrower_nft.power += lending.power;
-    borrower_nft.power -= power_fee;
+    borrower.power += lending.power;
+    borrower.power -= power_fee;;
+
+    //borrower_nft.power += lending.power;
+    //borrower_nft.power -= power_fee;
 
     assert!(lending.is_borrowed == false, "Card is already borrowed");
     assert!(
-        borrower_nft.power > lending.power,
+        borrower.power > lending.power,
         "Collateral nft power must be equal or higher than the amount borrowed"
     );
 
@@ -245,8 +260,10 @@ pub fn lendings(env: Env) -> Vec<Lending> {
     read_lendings(env.clone())
 }
 
-pub fn repay(env: Env, borrower: Address, lender: Address, category: Category, token_id: TokenId) {
-    borrower.require_auth();
+pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let borrower = read_user_by_fee_payer(e, fee_payer).owner;
+
     let mut lending = read_lending(
         env.clone(),
         lender.clone(),
@@ -303,8 +320,9 @@ pub fn repay(env: Env, borrower: Address, lender: Address, category: Category, t
     );
 }
 
-pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
-    lender.require_auth();
+pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let lender = read_user_by_fee_payer(e, fee_payer).owner;
 
     let lending = read_lending(
         env.clone(),

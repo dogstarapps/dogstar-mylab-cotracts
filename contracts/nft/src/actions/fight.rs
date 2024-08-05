@@ -47,7 +47,10 @@ pub struct Fight {
     pub leverage: u32,
 }
 
-pub fn write_fight(env: Env, owner: Address, category: Category, token_id: TokenId, fight: Fight) {
+pub fn write_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId, fight: Fight) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &fight);
     env.storage()
@@ -71,7 +74,9 @@ pub fn write_fight(env: Env, owner: Address, category: Category, token_id: Token
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_fight(env: Env, owner: Address, category: Category, token_id: TokenId) -> Fight {
+pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage()
         .persistent()
@@ -79,7 +84,9 @@ pub fn read_fight(env: Env, owner: Address, category: Category, token_id: TokenI
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_fight(env: Env, owner: Address, category: Category, token_id: TokenId) {
+pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
 
@@ -137,14 +144,16 @@ pub fn get_currency_price(env: Env, oracle_contract_id: Address, currency: Curre
 
 pub fn open_position(
     env: Env,
-    owner: Address,
+    fee_payer: Address,
     category: Category,
     token_id: TokenId,
     currency: Currency,
     side_position: SidePosition,
     leverage: u32,
 ) {
-    owner.require_auth();
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
 
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
     nft.locked_by_action = Action::Fight;
@@ -188,7 +197,8 @@ pub fn open_position(
     );
 }
 
-pub fn close_position(env: Env, owner: Address, category: Category, token_id: TokenId) {
+pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
     nft.locked_by_action = Action::None;
 

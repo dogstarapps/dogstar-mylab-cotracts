@@ -15,7 +15,9 @@ pub struct Deck {
     pub bonus: u32,
 }
 
-pub fn write_deck(env: Env, owner: Address, deck: Deck) {
+pub fn write_deck(env: Env, fee_payer: Address, deck: Deck) {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Deck(owner.clone());
     env.storage().persistent().set(&key, &deck);
     env.storage()
@@ -45,7 +47,8 @@ pub fn read_decks(env: Env) -> Vec<Deck> {
         .unwrap_or(vec![&env.clone()])
 }
 
-pub fn remove_deck(env: Env, owner: Address) {
+pub fn remove_deck(env: Env, fee_payer: Address) {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let key = DataKey::Deck(owner.clone());
     env.storage().persistent().remove(&key);
     if env.storage().persistent().has(&key) {
@@ -69,7 +72,9 @@ pub fn remove_deck(env: Env, owner: Address) {
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_deck(env: Env, owner: Address) -> Deck {
+pub fn read_deck(env: Env, fee_payer: Address) -> Deck {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Deck(owner);
     env.storage()
         .persistent()
@@ -77,8 +82,10 @@ pub fn read_deck(env: Env, owner: Address) -> Deck {
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
-    owner.require_auth();
+pub fn place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
+    
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
 
     assert!(categories.len() == 4, "Must place exactly 4 cards");
     assert!(token_ids.len() == 4, "Must place exactly 4 cards");
@@ -137,8 +144,9 @@ pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec
     update_haw_ai_percentages(env);
 }
 
-pub fn update_place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
-    owner.require_auth();
+pub fn update_place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
 
     assert!(categories.len() == 4, "Must place exactly 4 cards");
     assert!(token_ids.len() == 4, "Must place exactly 4 cards");
@@ -192,8 +200,9 @@ pub fn update_place(env: Env, owner: Address, categories: Vec<Category>, token_i
     update_haw_ai_percentages(env);
 }
 
-pub fn remove_place(env: Env, owner: Address) {
-    owner.require_auth();
+pub fn remove_place(env: Env, fee_payer: Address) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
 
     let deck = read_deck(env.clone(), owner.clone());
 

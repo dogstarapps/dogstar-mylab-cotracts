@@ -4,8 +4,10 @@ use nft_info::{read_nft, remove_nft, Category};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
 
-pub fn burn(env: Env, owner: Address, category: Category, token_id: TokenId) {
-    owner.require_auth();
+pub fn burn(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
 
     let config = read_config(&env);
 

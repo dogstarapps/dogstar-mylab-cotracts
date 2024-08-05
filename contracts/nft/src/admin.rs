@@ -53,7 +53,7 @@ pub fn is_whitelisted(e: &Env, member: &Address) -> bool {
 }
 
 pub fn write_config(e: &Env, config: &Config) {
-    let key = DataKey::Config;
+    let key: DataKey = DataKey::Config;
     e.storage().persistent().set(&key, config);
 }
 
@@ -88,4 +88,51 @@ pub fn mint_terry(e: &Env, to: Address, amount: i128) {
 pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
     let token_admin_client = StellarAssetClient::new(&e, &token);
     token_admin_client.mint(&to, &amount);
+}
+
+pub fn add_level(e: &Env,level :Level) {
+    auth_admin(&e, user)?;
+
+    let level_id = get_and_inc_level_id(&e);
+    e.storage().persistent().set(&DataKey::Level(level_id), &level);
+
+    Ok(level_id)
+
+}
+
+pub fn read_level(e: &Env, balance: u128) -> u8{
+
+    let last_level_id = env
+        .storage()
+        .persistent()
+        .get(&DataKey::LevelId)
+        .unwrap_or(Ok(0u8))
+        .unwrap_optimized();
+
+    for i in 1..last_level_id {
+        let level: Level = e
+        .storage()
+        .persistent()
+        .get(&DataKey::Level(i))
+        .unwrap();
+        
+        if balance > level.minimum_terry  && balance <= level.maximum_terry{
+            return i;
+        }
+            
+    }
+     
+
+}
+
+pub fn get_and_inc_level_id(env: &Env) -> u32 {
+    let prev = env
+        .storage()
+        .persistent()
+        .get(&DataKey::LevelId)
+        .unwrap_or(Ok(0u8))
+        .unwrap_optimized();
+
+    env.storage().persistent().set(&DataKey::LevelId, &(prev + 1));
+    prev + 1
 }

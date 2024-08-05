@@ -16,7 +16,8 @@ pub struct Stake {
     pub staked_block: u32,
 }
 
-pub fn write_stake(env: &Env, owner: Address, category: Category, token_id: TokenId, stake: Stake) {
+pub fn write_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId, stake: Stake) {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let key = DataKey::Stake(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &stake);
     env.storage()
@@ -48,7 +49,9 @@ pub fn read_stakes(env: Env) -> Vec<Stake> {
         .unwrap_or(vec![&env.clone()])
 }
 
-pub fn remove_stake(env: &Env, owner: Address, category: Category, token_id: TokenId) {
+pub fn remove_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let key = DataKey::Stake(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
     if env.storage().persistent().has(&key) {
@@ -74,7 +77,8 @@ pub fn remove_stake(env: &Env, owner: Address, category: Category, token_id: Tok
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_stake(env: &Env, owner: Address, category: Category, token_id: TokenId) -> Stake {
+pub fn read_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId) -> Stake {
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let key = DataKey::Stake(owner, category, token_id);
     env.storage()
         .persistent()
@@ -85,17 +89,18 @@ pub fn read_stake(env: &Env, owner: Address, category: Category, token_id: Token
 
 pub fn stake(
     env: Env,
-    owner: Address,
+    fee_payer: Address,
     category: Category,
     token_id: TokenId,
     stake_power: u32,
     period_index: u32,
 ) {
-    owner.require_auth();
+    fee_payer.require_auth();
     assert!(
         category == Category::Skill || category == Category::Leader,
         "Invalid Category to stake"
     );
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
 
     let config = read_config(&env);
     let power_fee = config.power_action_fee * stake_power / 100;
@@ -131,12 +136,14 @@ pub fn stake(
 
 pub fn increase_stake_power(
     env: Env,
-    owner: Address,
+    fee_payer: Address,
     category: Category,
     token_id: TokenId,
     increase_power: u32,
 ) {
-    owner.require_auth();
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
@@ -163,8 +170,9 @@ pub fn increase_stake_power(
     );
 }
 
-pub fn unstake(env: Env, owner: Address, category: Category, token_id: TokenId) {
-    owner.require_auth();
+pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let owner = read_user_by_fee_payer(e, fee_payer).owner;
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
