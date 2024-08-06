@@ -1,4 +1,4 @@
-use crate::storage_types::DataKey;
+use crate::storage_types::{DataKey, Level};
 use soroban_sdk::token::StellarAssetClient;
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
@@ -90,39 +90,13 @@ pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
     token_admin_client.mint(&to, &amount);
 }
 
-pub fn add_level(e: &Env,level :Level) {
-    auth_admin(&e, user)?;
-
+pub fn add_level(e: &Env, level: Level) -> u32 {
     let level_id = get_and_inc_level_id(&e);
-    e.storage().persistent().set(&DataKey::Level(level_id), &level);
-
-    Ok(level_id)
-
-}
-
-pub fn read_level(e: &Env, balance: u128) -> u8{
-
-    let last_level_id = env
-        .storage()
+    e.storage()
         .persistent()
-        .get(&DataKey::LevelId)
-        .unwrap_or(Ok(0u8))
-        .unwrap_optimized();
+        .set(&DataKey::Level(level_id), &level);
 
-    for i in 1..last_level_id {
-        let level: Level = e
-        .storage()
-        .persistent()
-        .get(&DataKey::Level(i))
-        .unwrap();
-        
-        if balance > level.minimum_terry  && balance <= level.maximum_terry{
-            return i;
-        }
-            
-    }
-     
-
+    level_id
 }
 
 pub fn get_and_inc_level_id(env: &Env) -> u32 {
@@ -130,9 +104,10 @@ pub fn get_and_inc_level_id(env: &Env) -> u32 {
         .storage()
         .persistent()
         .get(&DataKey::LevelId)
-        .unwrap_or(Ok(0u8))
-        .unwrap_optimized();
+        .unwrap_or(0u32);
 
-    env.storage().persistent().set(&DataKey::LevelId, &(prev + 1));
+    env.storage()
+        .persistent()
+        .set(&DataKey::LevelId, &(prev + 1));
     prev + 1
 }

@@ -1,6 +1,7 @@
 use crate::*;
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
+use user_info::read_user;
 use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Val, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
@@ -49,7 +50,7 @@ pub struct Fight {
 
 pub fn write_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId, fight: Fight) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &fight);
@@ -75,7 +76,7 @@ pub fn write_fight(env: Env, fee_payer: Address, category: Category, token_id: T
 }
 
 pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -86,7 +87,7 @@ pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: To
 
 pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
 
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
 
@@ -152,7 +153,7 @@ pub fn open_position(
     leverage: u32,
 ) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
 
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
@@ -198,7 +199,7 @@ pub fn open_position(
 }
 
 pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
     let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
     nft.locked_by_action = Action::None;
 

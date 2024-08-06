@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, String};
 
 use crate::nft_info::Category;
 
@@ -16,9 +16,9 @@ pub struct TokenId(pub u32);
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct Level {
-    pub minimum_terry: u32,
-    pub maximum_terry: u32,
-    pub name: string,
+    pub minimum_terry: u128,
+    pub maximum_terry: u128,
+    pub name: String,
 }
 #[derive(Clone)]
 #[contracttype]
@@ -37,6 +37,6 @@ pub enum DataKey {
     Lending(Address, Category, TokenId),
     Fights,
     Fight(Address, Category, TokenId),
-    Level(u8),
+    Level(u32),
     LevelId, 
 }

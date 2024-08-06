@@ -1,6 +1,7 @@
 use crate::*;
 use admin::{read_balance, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
+use user_info::read_user;
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
@@ -16,7 +17,7 @@ pub struct Deck {
 }
 
 pub fn write_deck(env: Env, fee_payer: Address, deck: Deck) {
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Deck(owner.clone());
     env.storage().persistent().set(&key, &deck);
@@ -48,7 +49,7 @@ pub fn read_decks(env: Env) -> Vec<Deck> {
 }
 
 pub fn remove_deck(env: Env, fee_payer: Address) {
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
     let key = DataKey::Deck(owner.clone());
     env.storage().persistent().remove(&key);
     if env.storage().persistent().has(&key) {
@@ -73,7 +74,7 @@ pub fn remove_deck(env: Env, fee_payer: Address) {
 }
 
 pub fn read_deck(env: Env, fee_payer: Address) -> Deck {
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Deck(owner);
     env.storage()
@@ -85,7 +86,7 @@ pub fn read_deck(env: Env, fee_payer: Address) -> Deck {
 pub fn place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
     
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     assert!(categories.len() == 4, "Must place exactly 4 cards");
     assert!(token_ids.len() == 4, "Must place exactly 4 cards");
@@ -146,7 +147,7 @@ pub fn place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids:
 
 pub fn update_place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     assert!(categories.len() == 4, "Must place exactly 4 cards");
     assert!(token_ids.len() == 4, "Must place exactly 4 cards");
@@ -202,7 +203,7 @@ pub fn update_place(env: Env, fee_payer: Address, categories: Vec<Category>, tok
 
 pub fn remove_place(env: Env, fee_payer: Address) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let deck = read_deck(env.clone(), owner.clone());
 

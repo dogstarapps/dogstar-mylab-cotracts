@@ -3,7 +3,7 @@ use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
-// use user::{read_user, write_user};
+use user_info::{read_user, write_user};
 
 #[contracttype]
 #[derive(Clone, PartialEq)]
@@ -29,7 +29,7 @@ pub fn write_lending(
     lending: Lending,
 ) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &lending);
@@ -56,7 +56,7 @@ pub fn write_lending(
 
 pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Lending {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -67,7 +67,7 @@ pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: 
 
 pub fn remove_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -112,7 +112,7 @@ pub fn lend(
     duration: u32,
 ) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
     assert!(category == Category::Human, "Invalid Category to lend");
 
@@ -171,12 +171,13 @@ pub fn borrow(
     collateral_token_id: TokenId,
 ) {
     fee_payer.require_auth();
-    let borrower = read_user_by_fee_payer(e, fee_payer).owner;
+    let mut borrower = read_user(&env, fee_payer);
+    let borrower_address = borrower.owner.clone();
 
 
     let mut borrower_nft = read_nft(
         &env.clone(),
-        borrower.clone(),
+        borrower_address.clone(),
         collateral_category.clone(),
         collateral_token_id.clone(),
     );
@@ -221,7 +222,7 @@ pub fn borrow(
 
     write_nft(
         &env,
-        borrower.clone(),
+        borrower_address.clone(),
         collateral_category.clone(),
         collateral_token_id.clone(),
         borrower_nft,
@@ -237,15 +238,14 @@ pub fn borrow(
         lender_nft,
     );
 
-    lending.borrower = borrower.clone();
+    lending.borrower = borrower_address;
     lending.collateral_category = collateral_category;
     lending.collateral_token_id = collateral_token_id;
     lending.is_borrowed = true;
     lending.borrowed_block = env.ledger().sequence();
 
-    // let mut user = read_user(&env.clone(), borrower.clone());
-    // user.borrowed_power += lending.power;
-    // write_user(&env.clone(), borrower.clone(), user);
+    borrower.power += lending.power;
+    write_user(&env.clone(), borrower);
 
     write_lending(
         env.clone(),
@@ -262,7 +262,7 @@ pub fn lendings(env: Env) -> Vec<Lending> {
 
 pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
-    let borrower = read_user_by_fee_payer(e, fee_payer).owner;
+    let borrower = read_user(&env, fee_payer).owner;
 
     let mut lending = read_lending(
         env.clone(),
@@ -322,7 +322,7 @@ pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, 
 
 pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
-    let lender = read_user_by_fee_payer(e, fee_payer).owner;
+    let lender = read_user(&env, fee_payer).owner;
 
     let lending = read_lending(
         env.clone(),

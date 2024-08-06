@@ -3,10 +3,11 @@ use admin::{mint_terry, read_balance, read_config, write_balance};
 use nft_info::{read_nft, remove_nft, Category};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
+use user_info::read_user;
 
 pub fn burn(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
-    let owner = read_user_by_fee_payer(e, fee_payer).owner;
+    let owner = read_user(&env, fee_payer).owner;
 
 
     let config = read_config(&env);

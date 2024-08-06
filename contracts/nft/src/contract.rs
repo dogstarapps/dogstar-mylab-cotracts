@@ -3,15 +3,17 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    has_administrator, mint_terry, mint_token, read_administrator, read_balance, read_config,
-    write_administrator, write_balance, write_config, Balance, Config,
+    add_level, has_administrator, mint_terry, mint_token, read_administrator, read_balance,
+    read_config, write_administrator, write_balance, write_config, Balance, Config,
 };
 use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
 };
-use crate::storage_types::{DataKey, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
-use crate::user_info::{read_user, read_user_by_fee_payer, write_user};
-use soroban_sdk::Vec;
+use crate::storage_types::{
+    DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
+};
+use crate::user_info::{get_user_level, read_user};
+use soroban_sdk::{Vec, vec, String};
 pub use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
 use soroban_token_sdk::TokenUtils;
 
@@ -37,6 +39,64 @@ impl NFT {
                 total_deck_power: 0,
             },
         );
+
+        let levels = vec![
+            &e.clone(),
+            Level {
+                minimum_terry: 0,
+                maximum_terry: 1000,
+                name: String::from_str(&e, "PLASTICLOVER"),
+            },
+            Level {
+                minimum_terry: 1001,
+                maximum_terry: 5000,
+                name: String::from_str(&e, "SHITCOINER"),
+            },
+            Level {
+                minimum_terry: 5001,
+                maximum_terry: 25000,
+                name: String::from_str(&e, "MEMECE0"),
+            },
+            Level {
+                minimum_terry: 25001,
+                maximum_terry: 200000,
+                name: String::from_str(&e, "CRYPTOBRO"),
+            },
+            Level {
+                minimum_terry: 200001,
+                maximum_terry: 500000,
+                name: String::from_str(&e, "CHIEF"),
+            },
+            Level {
+                minimum_terry: 500001,
+                maximum_terry: 2000000,
+                name: String::from_str(&e, "BOSS"),
+            },
+            Level {
+                minimum_terry: 2000001,
+                maximum_terry: 5000000,
+                name: String::from_str(&e, "DIVINE"),
+            },
+            Level {
+                minimum_terry: 5000001,
+                maximum_terry: 10000000,
+                name: String::from_str(&e, "LEGEND"),
+            },
+            Level {
+                minimum_terry: 10000001,
+                maximum_terry: 15000000,
+                name: String::from_str(&e, "IMMORTAL"),
+            },
+            Level {
+                minimum_terry: 15000001,
+                maximum_terry: u128::MAX,
+                name: String::from_str(&e, "Level 10"),
+            },
+        ];
+
+        for (i, level) in levels.into_iter().enumerate() {
+            add_level(&e, level);
+        }
     }
 
     pub fn mint(
@@ -49,10 +109,9 @@ impl NFT {
     ) {
         fee_payer.require_auth();
         let admin = read_administrator(&env);
-        let user = read_user_by_fee_payer(e, fee_payer);
-        let user_level = user.level; 
-        let to :Address = user.owner; 
-        //let user_level = read_user(&env, to.clone()).level;
+        let user = read_user(&env, fee_payer);
+        let to: Address = user.owner;
+        let user_level = get_user_level(&env, to.clone());
         assert!(
             user_level >= card_level,
             "User level too low to mint this card"
@@ -113,16 +172,6 @@ impl NFT {
         e.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    pub fn set_user_level(e: Env, user: Address, level: u32) {
-        let admin = read_administrator(&e);
-        admin.require_auth();
-
-        let mut user_info = read_user(&e, user.clone());
-        user_info.level = level;
-
-        write_user(&e, user.clone(), user_info);
-    }
-
     pub fn set_admin(e: Env, new_admin: Address) {
         let admin = read_administrator(&e);
         admin.require_auth();
@@ -133,6 +182,10 @@ impl NFT {
 
         write_administrator(&e, &new_admin);
         TokenUtils::new(&e).events().set_admin(admin, new_admin);
+    }
+
+    pub fn add_level(e: &Env, level: Level) -> u32 {
+        add_level(e, level)
     }
 
     pub fn add_to_whitelist(e: &Env, members: Vec<Address>) {
@@ -193,7 +246,14 @@ impl NFT {
         stake_power: u32,
         period_index: u32,
     ) {
-        stake::stake(env, fee_payer, category, token_id, stake_power, period_index)
+        stake::stake(
+            env,
+            fee_payer,
+            category,
+            token_id,
+            stake_power,
+            period_index,
+        )
     }
 
     pub fn increase_stake_power(
