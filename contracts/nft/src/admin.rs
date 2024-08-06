@@ -99,6 +99,12 @@ pub fn add_level(e: &Env, level: Level) -> u32 {
     level_id
 }
 
+pub fn update_level(e: &Env, level_id: u32, level: Level) {
+    e.storage()
+        .persistent()
+        .set(&DataKey::Level(level_id), &level);
+}
+
 pub fn get_and_inc_level_id(env: &Env) -> u32 {
     let prev = env
         .storage()

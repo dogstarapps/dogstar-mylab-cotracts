@@ -3,8 +3,7 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, mint_terry, mint_token, read_administrator, read_balance,
-    read_config, write_administrator, write_balance, write_config, Balance, Config,
+    add_level, has_administrator, mint_terry, mint_token, read_administrator, read_balance, read_config, update_level, write_administrator, write_balance, write_config, Balance, Config
 };
 use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
@@ -99,6 +98,13 @@ impl NFT {
         }
     }
 
+    pub fn update_level(e: Env, level_id: u32, level: Level) {
+        let admin: Address = read_administrator(&e);
+        admin.require_auth();
+
+        update_level(&e, level_id, level);
+    }
+
     pub fn mint(
         env: Env,
         fee_payer: Address,
@@ -166,7 +172,7 @@ impl NFT {
     }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
-        let admin: Address = e.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = read_administrator(&e);
         admin.require_auth();
 
         e.deployer().update_current_contract_wasm(new_wasm_hash);
