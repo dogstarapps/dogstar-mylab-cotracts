@@ -198,7 +198,7 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     let config = read_config(&env);
     let terry_amount = config.terry_per_power * interest_amount as i128;
 
-    // mint_terry(&env, owner.clone(), terry_amount);
+    mint_terry(&env, owner.clone(), terry_amount);
 
     remove_stake(&env, owner.clone(), category.clone(), token_id.clone());
 }

@@ -19,9 +19,9 @@ pub fn burn(env: Env, fee_payer: Address, category: Category, token_id: TokenId)
     let haw_ai_amount = terry_amount - receive_amount;
 
     // mint 50% of terry amount to the owner
-    // mint_terry(&env, owner.clone(), receive_amount);
+    mint_terry(&env, owner.clone(), receive_amount);
     // mint 50% of terry amount to the haw ai pot
-    // mint_terry(&env, config.haw_ai_pot.clone(), haw_ai_amount);
+    mint_terry(&env, config.haw_ai_pot.clone(), haw_ai_amount);
 
     let mut balance = read_balance(&env);
     // update haw ai terry balance and power balance

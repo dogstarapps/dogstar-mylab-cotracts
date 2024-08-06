@@ -98,6 +98,13 @@ impl NFT {
         }
     }
 
+    pub fn add_new_level(e: Env, level: Level) {
+        let admin: Address = read_administrator(&e);
+        admin.require_auth();
+
+        add_level(&e, level);
+    }
+
     pub fn update_level(e: Env, level_id: u32, level: Level) {
         let admin: Address = read_administrator(&e);
         admin.require_auth();
