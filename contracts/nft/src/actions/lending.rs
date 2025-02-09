@@ -114,14 +114,13 @@ pub fn lend(
     fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
-    assert!(category == Category::Human, "Invalid Category to lend");
+    assert!(category == Category::Resource, "Invalid Category to lend");
 
     let mut nft = read_nft(
         &env.clone(),
         owner.clone(),
-        category.clone(),
         token_id.clone(),
-    );
+    ).unwrap();
     assert!(
         nft.locked_by_action == Action::None,
         "Card is locked by another action"
@@ -133,7 +132,6 @@ pub fn lend(
     write_nft(
         &env.clone(),
         owner.clone(),
-        category.clone(),
         token_id.clone(),
         nft,
     );
@@ -171,22 +169,20 @@ pub fn borrow(
     collateral_token_id: TokenId,
 ) {
     fee_payer.require_auth();
-    let mut borrower = read_user(&env, fee_payer);
+    let mut borrower = read_user(&env, fee_payer.clone());
     let borrower_address = borrower.owner.clone();
 
 
     let mut borrower_nft = read_nft(
         &env.clone(),
         borrower_address.clone(),
-        collateral_category.clone(),
         collateral_token_id.clone(),
-    );
+    ).unwrap();
     let mut lender_nft = read_nft(
         &env.clone(),
         lender.clone(),
-        category.clone(),
         token_id.clone(),
-    );
+    ).unwrap();
 
     assert!(
         borrower_nft.locked_by_action == Action::None,
@@ -223,7 +219,6 @@ pub fn borrow(
     write_nft(
         &env,
         borrower_address.clone(),
-        collateral_category.clone(),
         collateral_token_id.clone(),
         borrower_nft,
     );
@@ -233,7 +228,6 @@ pub fn borrow(
     write_nft(
         &env,
         lender.clone(),
-        category.clone(),
         token_id.clone(),
         lender_nft,
     );
@@ -245,7 +239,7 @@ pub fn borrow(
     lending.borrowed_block = env.ledger().sequence();
 
     borrower.power += lending.power;
-    write_user(&env.clone(), borrower);
+    write_user(&env.clone(), fee_payer.clone(), borrower);
 
     write_lending(
         env.clone(),
@@ -262,7 +256,7 @@ pub fn lendings(env: Env) -> Vec<Lending> {
 
 pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
-    let borrower = read_user(&env, fee_payer).owner;
+    let borrower = read_user(&env, fee_payer.clone()).owner;
 
     let mut lending = read_lending(
         env.clone(),
@@ -278,15 +272,13 @@ pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, 
     let mut lender_nft = read_nft(
         &env.clone(),
         lender.clone(),
-        category.clone(),
         token_id.clone(),
-    );
+    ).unwrap();
     let mut borrower_nft = read_nft(
         &env.clone(),
         borrower.clone(),
-        lending.collateral_category.clone(),
         lending.collateral_token_id.clone(),
-    );
+    ).unwrap();
 
     lender_nft.power += interest_amount;
 
@@ -296,7 +288,6 @@ pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, 
     write_nft(
         &env.clone(),
         lender.clone(),
-        category.clone(),
         token_id.clone(),
         lender_nft,
     );
@@ -304,7 +295,6 @@ pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, 
     write_nft(
         &env.clone(),
         borrower.clone(),
-        lending.collateral_category.clone(),
         lending.collateral_token_id.clone(),
         borrower_nft,
     );
@@ -347,15 +337,13 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         let mut lender_nft = read_nft(
             &env.clone(),
             lender.clone(),
-            category.clone(),
             token_id.clone(),
-        );
+        ).unwrap();
         let mut borrower_nft = read_nft(
             &env.clone(),
             lending.borrower.clone(),
-            lending.collateral_category.clone(),
             lending.collateral_token_id.clone(),
-        );
+        ).unwrap();
 
         lender_nft.power += interest_amount;
 
@@ -365,7 +353,6 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         write_nft(
             &env.clone(),
             lender.clone(),
-            category.clone(),
             token_id.clone(),
             lender_nft,
         );
@@ -373,7 +360,6 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         write_nft(
             &env.clone(),
             lending.borrower.clone(),
-            lending.collateral_category.clone(),
             lending.collateral_token_id.clone(),
             borrower_nft,
         );

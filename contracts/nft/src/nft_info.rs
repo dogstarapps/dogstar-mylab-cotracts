@@ -6,7 +6,7 @@ use crate::storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETI
 #[contracttype]
 pub enum Category {
     Leader,
-    Human,
+    Resource,
     Skill,
     Weapon,
 }
@@ -30,10 +30,9 @@ pub enum Action {
     Deck,
 }
 
-#[derive(Clone)]
 #[contracttype]
+#[derive(Clone)]
 pub struct Card {
-    pub dl_level: u32,
     pub power: u32,
     pub locked_by_action: Action,
 }
@@ -58,29 +57,29 @@ impl CardInfo {
     }
 }
 
-pub fn write_nft(env: &Env, owner: Address, category: Category, token_id: TokenId, nft: Card) {
-    let key = DataKey::Card(owner, category, token_id);
-    env.storage().persistent().set(&key, &nft);
+pub fn write_nft(env: &Env, owner: Address, token_id: TokenId, card: Card) {
+    let key = DataKey::Card( owner, token_id);
+    env.storage().persistent().set(&key, &card);
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_nft(env: &Env, owner: Address, category: Category, token_id: TokenId) -> Card {
-    let key = DataKey::Card(owner, category, token_id);
+pub fn read_nft(env: &Env, owner: Address,  token_id: TokenId,) -> Option<Card> {
+    let key = DataKey::Card(owner, token_id);
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
-    let key: DataKey = DataKey::Card(owner, category, token_id);
+pub fn exists(env: &Env, owner: Address, token_id: TokenId) -> bool {
+    let key: DataKey = DataKey::Card( owner, token_id.clone());
     env.storage().persistent().has(&key)    
 }
 
-pub fn remove_nft(env: &Env, owner: Address, category: Category, token_id: TokenId) {
-    let key = DataKey::Card(owner, category, token_id);
+pub fn remove_nft(env: &Env, owner: Address,  token_id: TokenId) {
+    let key = DataKey::Card(owner, token_id.clone());
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);

@@ -3,7 +3,7 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, mint_terry, mint_token, read_administrator, read_balance, read_config, update_level, write_administrator, write_balance, write_config, Balance, Config
+    add_level, has_administrator, transfer_terry, mint_token, read_administrator, read_balance, read_config, update_level, write_administrator, write_balance, write_config, Balance, Config
 };
 use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
@@ -11,10 +11,13 @@ use crate::nft_info::{
 use crate::storage_types::{
     DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
-use crate::user_info::{get_user_level, read_user};
+use crate::user_info::{get_user_level, read_owner_card, read_user, write_user, User};
+use crate::metadata::{read_metadata,write_metadata, CardMetadata};
+use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Vec, vec, String};
-pub use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
+use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env,log};
 use soroban_token_sdk::TokenUtils;
+
 
 #[contract]
 pub struct NFT;
@@ -115,67 +118,78 @@ impl NFT {
     pub fn mint(
         env: Env,
         fee_payer: Address,
-        category: Category,
         token_id: TokenId,
         card_level: u32,
         buy_currency: Currency,
     ) {
+         
         fee_payer.require_auth();
+       
         let admin = read_administrator(&env);
-        let user = read_user(&env, fee_payer);
+        let user = read_user(&env, fee_payer.clone());
         let to: Address = user.owner;
         let user_level = get_user_level(&env, to.clone());
+      
         assert!(
             user_level >= card_level,
             "User level too low to mint this card"
         );
+         
         assert!(
-            !Self::exists(&env, to.clone(), category.clone(), token_id.clone()),
+            !Self::exists(&env, to.clone(),  token_id.clone()),
             "Token ID already exists"
         );
-        let card_info = CardInfo::get_default_card(category.clone());
+        
+        let card_metadata = read_metadata(&env, token_id.clone().0);
         let nft = Card {
-            power: card_info.initial_power,
-            dl_level: card_level,
+            power: card_metadata.initial_power,
             locked_by_action: Action::None,
         };
-        write_nft(&env, to.clone(), category, token_id, nft.clone());
-
+        write_nft(&env, to.clone(), token_id.clone(), nft.clone());
+  
         // puchase by currency
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
+        
         if buy_currency == Currency::Terry {
+          
             let token = token::Client::new(&env, &config.terry_token.clone());
             let withdrawable_amount =
-                (config.withdrawable_percentage as i128) * card_info.price_terry / 100;
-            let haw_ai_amount = card_info.price_terry - withdrawable_amount;
-            // 50% of terry price to the admin and 50% to the haw ai pot
-            token.transfer(&to.clone(), &admin, &withdrawable_amount);
-            token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
+                (config.withdrawable_percentage as i128) * card_metadata.price_terry / 100;
+            //let withdrawable_amount  = 500;       
+            let haw_ai_amount = card_metadata.price_terry - withdrawable_amount;
+            
+            log!(&env, "dime Terry {}", withdrawable_amount);
+            // 50% of terry price to the admin and 50% to the haw ai pot 
+            token.transfer( &fee_payer.clone(), &admin, &withdrawable_amount);
+            token.transfer(&fee_payer.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.admin_terry += withdrawable_amount;
             balance.haw_ai_terry += haw_ai_amount;
+        
+            
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
-            let burnable_amount = (config.burnable_percentage as i128) * card_info.price_xtar / 100;
-            let haw_ai_amount = card_info.price_terry - burnable_amount;
+            let burnable_amount = (config.burnable_percentage as i128) * card_metadata.price_xtar / 100;
+            let haw_ai_amount = card_metadata.price_terry - burnable_amount;
             // 50% of xtar price to burn and 50% to the haw ai pot
             token.burn(&to.clone(), &burnable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.haw_ai_xtar += haw_ai_amount;
         };
-
+        
         write_balance(&env, &balance);
+        
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, category: Category, token_id: TokenId) {
         from.require_auth();
-        let nft = read_nft(&env, from.clone(), category.clone(), token_id.clone());
-        remove_nft(&env, from.clone(), category.clone(), token_id.clone());
-        write_nft(&env, to, category, token_id, nft);
+        let nft: Card = read_nft(&env, from.clone(),  token_id.clone()).unwrap();
+        remove_nft(&env, from.clone(),  token_id.clone());
+        write_nft(&env, to, token_id, nft);
     }
 
-    pub fn burn(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-        burn::burn(env, fee_payer, category, token_id)
+    pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
+        burn::burn(env, fee_payer,  token_id)
     }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
@@ -223,20 +237,21 @@ impl NFT {
         }
     }
 
-    pub fn exists(env: &Env, owner: Address, category: Category, token_id: TokenId) -> bool {
-        exists(env, owner, category, token_id)
+    pub fn card(env: &Env, owner: Address,  token_id: TokenId) -> Option<Card> {
+        read_nft(env, owner, token_id)
+    }
+
+    pub fn exists(env: &Env, owner: Address,  token_id: TokenId) -> bool {
+        exists(env, owner, token_id)
     }
 
     pub fn admin_balance(env: &Env) -> Balance {
         read_balance(&env)
     }
 
-    pub fn card(env: Env, owner: Address, category: Category, token_id: TokenId) -> Card {
-        read_nft(&env, owner, category, token_id)
-    }
 
-    pub fn mint_terry(env: Env, to: Address, amount: i128) {
-        mint_terry(&env, to, amount)
+    pub fn transfer_terry(env: Env, to: Address, amount: i128) {
+        transfer_terry(&env, to, amount)
     }
 
     pub fn mint_token(env: Env, token: Address, to: Address, amount: i128) {
@@ -246,8 +261,76 @@ impl NFT {
     pub fn config(env: Env) -> Config {
         read_config(&env)
     }
-}
 
+    pub fn transfer_terry_contract(e: &Env, to: Address, amount: i128) {
+        to.require_auth();
+        let config = read_config(&e);
+        let token_admin_client = TokenClient::new(&e, &config.terry_token);
+        token_admin_client.transfer(&to, &e.current_contract_address(), &amount);
+    }
+
+    
+    pub fn create_metadata (e: &Env, card: CardMetadata, id: u32){
+        //let admin: Address = read_administrator(&e);
+        //admin.require_auth();
+        write_metadata(e, id, card);
+    }
+
+    pub fn get_card(e: &Env, id: u32) -> CardMetadata  {
+        //let key = DataKey::Metadata(TokenId(id));
+        //e.storage().instance().get(&key).unwrap()
+        read_metadata(e, id)
+    }
+
+    pub fn create_user (e: Env, fee_payer: Address, owner: Address){
+        //it should be admin
+        let user : User = User {
+            owner,
+            power : 100
+        };
+        write_user(&e,fee_payer, user);
+    }
+
+    pub fn get_all_cards(e: &Env) -> soroban_sdk::Vec<CardMetadata> {
+        let mut all_cards = soroban_sdk::Vec::new(&e);
+
+        // Recuperamos todos los identificadores de cartas
+        let card_ids = e
+            .storage()
+            .persistent()
+            .get::<DataKey, soroban_sdk::Vec<TokenId>>(&DataKey::AllCardIds)
+            .unwrap_or(soroban_sdk::Vec::new(&e));
+
+        // Iteramos sobre cada identificador de carta y recuperamos la metadata
+        for token_id in card_ids.iter() {
+            let card_metadata = read_metadata(e, token_id.0);
+            all_cards.push_back(card_metadata); // Usamos push_back en lugar de push
+        }
+
+        all_cards
+    }
+
+    pub fn get_player_cards_with_state(e: &Env, player: Address) -> soroban_sdk::Vec<(CardMetadata, Card)> {
+        let mut player_cards = soroban_sdk::Vec::new(&e);
+
+        // Recuperamos las cartas del jugador
+        let owned_card_ids = read_owner_card(e, player.clone());
+
+        // Iteramos sobre las cartas del jugador
+        for token_id in owned_card_ids.iter() {
+            let card_metadata = read_metadata(e, token_id.0);  // Recupera la metadata
+            // Usamos `if let` para manejar la opción de la carta
+            if let Some(card) = read_nft(e, player.clone(), token_id.clone()) {
+                // Si la carta existe, la agregamos
+                player_cards.push_back((card_metadata, card));
+            }
+            
+        }
+
+        player_cards
+    }
+
+}
 // Stake
 #[contractimpl]
 impl NFT {

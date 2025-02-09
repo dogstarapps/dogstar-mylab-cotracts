@@ -13,3 +13,4 @@ soroban-token-sdk = { version = "20.3.1" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+

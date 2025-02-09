@@ -1,5 +1,5 @@
 use crate::*;
-use admin::{mint_terry, read_balance, read_config, write_balance};
+use admin::{transfer_terry, read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -106,7 +106,7 @@ pub fn stake(
     let config = read_config(&env);
     let power_fee = config.power_action_fee * stake_power / 100;
 
-    let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+    let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::None, "Locked NFT");
 
     nft.locked_by_action = Action::Stake;
@@ -116,7 +116,7 @@ pub fn stake(
     balance.haw_ai_power += power_fee;
     write_balance(&env, &balance);
 
-    write_nft(&env, owner.clone(), category.clone(), token_id.clone(), nft);
+    write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     write_stake(
         &env,
@@ -145,7 +145,7 @@ pub fn increase_stake_power(
     fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
-    let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+    let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
     let mut stake = read_stake(&env, owner.clone(), category.clone(), token_id.clone());
@@ -156,7 +156,7 @@ pub fn increase_stake_power(
     stake.power -= power_fee;
 
     nft.power -= increase_power;
-    write_nft(&env, owner.clone(), category.clone(), token_id.clone(), nft);
+    write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
@@ -174,7 +174,7 @@ pub fn increase_stake_power(
 pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
     fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
-    let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+    let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
     let current_block = env.ledger().sequence();
@@ -193,12 +193,12 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     };
     nft.power += interest_amount;
 
-    write_nft(&env, owner.clone(), category.clone(), token_id.clone(), nft);
+    write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     let config = read_config(&env);
     let terry_amount = config.terry_per_power * interest_amount as i128;
 
-    mint_terry(&env, owner.clone(), terry_amount);
+    transfer_terry(&env, owner.clone(), terry_amount);
 
     remove_stake(&env, owner.clone(), category.clone(), token_id.clone());
 }

@@ -3,8 +3,9 @@ extern crate std;
 
 use crate::{
     actions::{fight, SidePosition},
-    admin::Config,
+    admin::{Config},
     contract::NFT,
+    metadata::{write_metadata, CardMetadata},
     nft_info::{Action, CardInfo, Category, Currency},
     storage_types::TokenId,
     NFTClient,
@@ -12,11 +13,14 @@ use crate::{
 use soroban_sdk::{token::{StellarAssetClient, TokenClient}, String};
 use soroban_sdk::{testutils::Address as _, vec, Address, Env};
 
-fn create_nft<'a>(e: &Env, admin: &Address, config: &Config) -> NFTClient<'a> {
-    let nft: NFTClient = NFTClient::new(e, &e.register_contract(None, NFT {}));
+fn create_nft<'a>(e: Env, admin: &Address, config: &Config) -> NFTClient<'a> {
+    let nft: NFTClient = NFTClient::new(&e, &e.register_contract(None, NFT {}));
     nft.initialize(admin, config);
+    
     nft
 }
+
+
 
 fn generate_config(e: &Env) -> Config {
     Config {
@@ -40,6 +44,8 @@ fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
     token_admin_client.mint(&to, &amount);
 }
 
+
+
 #[test]
 fn test_mint() {
     let e = Env::default();
@@ -59,29 +65,29 @@ fn test_mint() {
     let terry_token_client = TokenClient::new(&e, &terry_token);
     let xtar_token_client = TokenClient::new(&e, &xtar_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     // Mint terry tokens to user1
-    mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
-    assert_eq!(terry_token_client.balance(&user1), 1000);
+    mint_token(&e, config.terry_token.clone(), user1.clone(), 100000);
+    assert_eq!(terry_token_client.balance(&user1), 100000);
 
     // Mint xtar tokens to user2
-    mint_token(&e, config.xtar_token.clone(), user2.clone(), 1000);
-    assert_eq!(xtar_token_client.balance(&user2), 1000);
+    mint_token(&e, config.xtar_token.clone(), user2.clone(), 100000);
+    assert_eq!(xtar_token_client.balance(&user2), 100000);
 
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
-    nft.set_user_level(&user2.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user2.clone(), &1);
 
     // Mint token 1 to user1
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Leader, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == true);
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
-    let card = nft.card(&user1, &Category::Leader, &TokenId(1));
+    let card = nft.card(&user1, &TokenId(1)).unwrap();
     let card_info = CardInfo::get_default_card(Category::Leader);
 
-    assert!(card.dl_level == 1 && card.power == card_info.initial_power);
+    assert!( card.power == card_info.initial_power);
 
     assert_eq!(
         terry_token_client.balance(&user1),
@@ -103,12 +109,12 @@ fn test_mint() {
     );
 
     // Mint token 2 to user1
-    assert!(nft.exists(&user2, &Category::Leader, &TokenId(1)) == false);
-    nft.mint(&user2, &Category::Leader, &TokenId(1), &1, &Currency::Xtar);
-    assert!(nft.exists(&user2, &Category::Leader, &TokenId(1)) == true);
+    assert!(nft.exists(&user2,  &TokenId(1)) == false);
+    nft.mint(&user2,  &TokenId(1), &1, &Currency::Xtar);
+    assert!(nft.exists(&user2, &TokenId(1)) == true);
 
-    let card = nft.card(&user2, &Category::Leader, &TokenId(1));
-    assert!(card.dl_level == 1 && card.power == card_info.initial_power);
+    let card = nft.card(&user2,  &TokenId(1)).unwrap();
+    assert!( card.power == card_info.initial_power);
 
     assert_eq!(
         terry_token_client.balance(&user1),
@@ -143,26 +149,26 @@ fn test_stake() {
     config.terry_token = terry_token.clone();
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     // Mint terry tokens to user1
     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
     assert_eq!(terry_token_client.balance(&user1), 1000);
 
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
 
     // Mint token 1 to user1
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Leader, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == true);
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1, &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
     let card_info = CardInfo::get_default_card(Category::Leader);
 
     // Stake
     let stake_power = 100;
     nft.stake(&user1, &Category::Leader, &TokenId(1), &stake_power, &0);
-    let card = nft.card(&user1, &Category::Leader, &TokenId(1));
+    let card = nft.card(&user1,  &TokenId(1)).unwrap();
     let power_action_fee = config.power_action_fee * stake_power / 100;
     assert!(
         card.locked_by_action == Action::Stake
@@ -178,7 +184,7 @@ fn test_stake() {
     // Increase Stake Power
     let increase_power = 200;
     nft.increase_stake_power(&user1, &Category::Leader, &TokenId(1), &increase_power);
-    let card = nft.card(&user1, &Category::Leader, &TokenId(1));
+    let card = nft.card(&user1,  &TokenId(1)).unwrap();
     let increased_power_action_fee = config.power_action_fee * increase_power / 100;
     assert!(
         card.locked_by_action == Action::Stake
@@ -218,19 +224,19 @@ fn test_fight() {
     config.terry_token = terry_token.clone();
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     // Mint terry tokens to user1
     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
     assert_eq!(terry_token_client.balance(&user1), 1000);
 
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
 
     // Mint token 1 to user1
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Leader, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == true);
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
     let card_info = CardInfo::get_default_card(Category::Leader);
 
@@ -262,7 +268,7 @@ fn test_lending() {
     config.terry_token = terry_token.clone();
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     // Mint terry tokens to user1 & user2
     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
@@ -270,30 +276,30 @@ fn test_lending() {
     mint_token(&e, config.terry_token.clone(), user2.clone(), 1000);
     assert_eq!(terry_token_client.balance(&user2), 1000);
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
-    nft.set_user_level(&user2.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user2.clone(), &1);
 
     // Mint token 1 to user1
-    assert!(nft.exists(&user1, &Category::Human, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Human, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Human, &TokenId(1)) == true);
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
-    assert!(nft.exists(&user2, &Category::Human, &TokenId(1)) == false);
-    nft.mint(&user2, &Category::Human, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user2, &Category::Human, &TokenId(1)) == true);
+    assert!(nft.exists(&user2,  &TokenId(1)) == false);
+    nft.mint(&user2,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user2,  &TokenId(1)) == true);
 
     // Create a Lend token 1
-    nft.lend(&user1, &Category::Human, &TokenId(1), &100, &1, &10);
+    nft.lend(&user1, &Category::Resource, &TokenId(1), &100, &1, &10);
     nft.borrow(
         &user2,
         &user1,
-        &Category::Human,
+        &Category::Resource,
         &TokenId(1),
-        &Category::Human,
+        &Category::Resource,
         &TokenId(1),
     );
-    nft.repay(&user2, &user1, &Category::Human, &TokenId(1));
-    nft.withdraw(&user1, &Category::Human, &TokenId(1));
+    nft.repay(&user2, &user1, &Category::Resource, &TokenId(1));
+    nft.withdraw(&user1, &Category::Resource, &TokenId(1));
 }
 
 #[test]
@@ -312,7 +318,7 @@ fn test_deck() {
     config.terry_token = terry_token.clone();
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     // Mint terry tokens to user1 & user2
     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
@@ -320,35 +326,35 @@ fn test_deck() {
     mint_token(&e, config.terry_token.clone(), user2.clone(), 1000);
     assert_eq!(terry_token_client.balance(&user2), 1000);
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
-    nft.set_user_level(&user2.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user2.clone(), &1);
 
     // Mint token 1,2,3,4 to user1
-    assert!(nft.exists(&user1, &Category::Human, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Human, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Human, &TokenId(1)) == true);
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1, &TokenId(1)) == true);
 
-    nft.mint(&user1, &Category::Human, &TokenId(2), &1, &Currency::Terry);
-    nft.mint(&user1, &Category::Human, &TokenId(3), &1, &Currency::Terry);
-    nft.mint(&user1, &Category::Human, &TokenId(4), &1, &Currency::Terry);
+    nft.mint(&user1,  &TokenId(2), &1, &Currency::Terry);
+    nft.mint(&user1,  &TokenId(3), &1, &Currency::Terry);
+    nft.mint(&user1,  &TokenId(4), &1, &Currency::Terry);
 
-    assert!(nft.exists(&user2, &Category::Human, &TokenId(1)) == false);
-    nft.mint(&user2, &Category::Human, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user2, &Category::Human, &TokenId(1)) == true);
+    assert!(nft.exists(&user2,  &TokenId(1)) == false);
+    nft.mint(&user2,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user2,  &TokenId(1)) == true);
 
-    nft.mint(&user2, &Category::Leader, &TokenId(2), &1, &Currency::Terry);
-    nft.mint(&user2, &Category::Skill, &TokenId(3), &1, &Currency::Terry);
-    nft.mint(&user2, &Category::Weapon, &TokenId(4), &1, &Currency::Terry);
+    nft.mint(&user2,  &TokenId(2), &1, &Currency::Terry);
+    nft.mint(&user2,  &TokenId(3), &1, &Currency::Terry);
+    nft.mint(&user2,  &TokenId(4), &1, &Currency::Terry);
 
     // Place User1 Deck
     nft.place(
         &user1,
         &vec![
             &e.clone(),
-            Category::Human,
-            Category::Human,
-            Category::Human,
-            Category::Human,
+            Category::Resource,
+            Category::Resource,
+            Category::Resource,
+            Category::Resource,
         ],
         &vec![&e.clone(), TokenId(1), TokenId(2), TokenId(3), TokenId(4)],
     );
@@ -357,7 +363,7 @@ fn test_deck() {
         &user2,
         &vec![
             &e.clone(),
-            Category::Human,
+            Category::Resource,
             Category::Leader,
             Category::Skill,
             Category::Weapon,
@@ -391,7 +397,7 @@ fn test_initialize_already_initialized() {
     // Generate config
     let config = generate_config(&e);
 
-    let nft = create_nft(&e, &admin, &config);
+    let nft = create_nft(e, &admin, &config);
 
     // Try to initialize again
     nft.initialize(&admin, &config);
@@ -408,7 +414,7 @@ fn test_set_admin() {
     // Generate config
     let config = generate_config(&e);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e, &admin1, &config);
 
     // Set new admin
     nft.set_admin(&admin2);
@@ -422,6 +428,7 @@ fn test_burn() {
 
     let admin1 = Address::generate(&e);
     let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
 
     // Generate config
     let mut config = generate_config(&e);
@@ -430,23 +437,49 @@ fn test_burn() {
     config.terry_token = terry_token.clone();
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
+    nft.set_admin(&admin1);
 
+    let card: CardMetadata =  CardMetadata {
+        name : String::from_str(&e, "Jed") , 
+        base_uri: String::from_str(&e, "asdasdasd") ,
+        thumb_uri: String::from_str(&e, "asdasdasd") ,
+        description: String::from_str(&e, "asdasdasd") ,
+        initial_power: 100,
+        max_power: 1000,
+        level: 1,
+        category: Category::Leader,
+        price_xtar: 10000,
+        price_terry: 400,
+    };
+
+    nft.create_metadata( &card, &1);
     // Mint terry tokens to user1
-    mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
-    assert_eq!(terry_token_client.balance(&user1), 1000);
+    mint_token(&e, config.terry_token.clone(), user1.clone(), 100000);
+    assert_eq!(terry_token_client.balance(&user1), 100000);
 
     // Set user level
-    nft.set_user_level(&user1.clone(), &1);
+    //nft.set_user_level(&user1.clone(), &1);
 
     // Mint token 1 to user1
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
-    nft.mint(&user1, &Category::Leader, &TokenId(1), &1, &Currency::Terry);
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == true);
-
+    assert!(nft.exists(&user2,  &TokenId(1)) == false);
+    nft.create_user( &user1,&user2);  
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    
+    
+    assert!(nft.exists(&user2, &TokenId(1)) == true);
+    
     // Burn
-    nft.burn(&user1, &Category::Leader, &TokenId(1));
-    assert!(nft.exists(&user1, &Category::Leader, &TokenId(1)) == false);
+    // Mint terry tokens to admin
+    mint_token(&e, config.terry_token.clone(), user2.clone(), 100000);
+   // assert_eq!(terry_token_client.balance(&admin1), 100000);
+    nft.transfer_terry_contract(&user2, &100000);
+
+   nft.burn(&user1, &TokenId(1));
+    
+   assert!(nft.exists(&user1,  &TokenId(1)) == false);
+     
+ 
 }
 
 #[test]
@@ -462,8 +495,8 @@ fn test_currency_price() {
 
     config.oracle_contract_id = Address::from_string(&String::from_str(&e, "CBKZFI26PDCZUJ5HYYKVB5BWCNYUSNA5LVL4R2JTRVSOB4XEP7Y34OPN"));
     
-    let nft = create_nft(&e, &admin1, &config);
+    let nft = create_nft(e, &admin1, &config);
 
-    let price = nft.currency_price(&fight::Currency::BTC);
+    let price = nft.currency_price(&config.oracle_contract_id );//&fight::Currency::BTC);
     assert!(price == 0);
 }

@@ -6,6 +6,9 @@ mod user_info;
 mod nft_info;
 mod storage_types;
 mod actions;
+mod metadata;
+mod error; 
+
 mod test;
 
 pub use crate::contract::NFTClient;

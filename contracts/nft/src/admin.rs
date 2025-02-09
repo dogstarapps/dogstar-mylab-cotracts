@@ -1,5 +1,5 @@
 use crate::storage_types::{DataKey, Level};
-use soroban_sdk::token::StellarAssetClient;
+use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
 #[contracttype]
@@ -79,11 +79,15 @@ pub fn read_balance(e: &Env) -> Balance {
     })
 }
 
-pub fn mint_terry(e: &Env, to: Address, amount: i128) {
+pub fn transfer_terry(e: &Env, to: Address, amount: i128) {
     let config = read_config(&e);
-    let token_admin_client = StellarAssetClient::new(&e, &config.terry_token);
-    token_admin_client.mint(&to, &amount);
+    let token_admin_client = TokenClient::new(&e, &config.terry_token);
+    token_admin_client.transfer(&e.current_contract_address(), &to, &amount);
 }
+
+
+
+
 
 pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
     let token_admin_client = StellarAssetClient::new(&e, &token);

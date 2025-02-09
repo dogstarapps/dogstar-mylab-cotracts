@@ -96,7 +96,7 @@ pub fn place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids:
     for i in 0..4 {
         let category = categories.get(i).unwrap();
         let token_id = token_ids.get(i).unwrap();
-        let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+        let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
 
         assert!(
             nft.locked_by_action == Action::None,
@@ -107,7 +107,6 @@ pub fn place(env: Env, fee_payer: Address, categories: Vec<Category>, token_ids:
         write_nft(
             &env,
             owner.clone(),
-            category.clone(),
             token_id.clone(),
             nft.clone(),
         );
@@ -157,7 +156,7 @@ pub fn update_place(env: Env, fee_payer: Address, categories: Vec<Category>, tok
     for i in 0..4 {
         let category = categories.get(i).unwrap();
         let token_id = token_ids.get(i).unwrap();
-        let nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+        let nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
 
         assert!(
             nft.locked_by_action == Action::None || nft.locked_by_action == Action::Deck,
@@ -210,12 +209,11 @@ pub fn remove_place(env: Env, fee_payer: Address) {
     for i in 0..4 {
         let category = deck.categories.get(i).unwrap();
         let token_id = deck.token_ids.get(i).unwrap();
-        let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+        let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
         nft.locked_by_action = Action::None;
         write_nft(
             &env.clone(),
             owner.clone(),
-            category.clone(),
             token_id.clone(),
             nft,
         );

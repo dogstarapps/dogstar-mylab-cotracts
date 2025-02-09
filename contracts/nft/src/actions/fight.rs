@@ -156,7 +156,7 @@ pub fn open_position(
     let owner = read_user(&env, fee_payer).owner;
 
 
-    let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+    let mut nft = read_nft(&env, owner.clone(),  token_id.clone()).unwrap();
     nft.locked_by_action = Action::Fight;
 
     let config = read_config(&env);
@@ -171,7 +171,6 @@ pub fn open_position(
     write_nft(
         &env,
         owner.clone(),
-        category.clone(),
         token_id.clone(),
         nft.clone(),
     );
@@ -200,7 +199,7 @@ pub fn open_position(
 
 pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
     let owner = read_user(&env, fee_payer).owner;
-    let mut nft = read_nft(&env, owner.clone(), category.clone(), token_id.clone());
+    let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     nft.locked_by_action = Action::None;
 
     let fight = read_fight(
@@ -235,7 +234,7 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
         nft.power += power as u32;
     }
 
-    write_nft(&env, owner.clone(), category.clone(), token_id.clone(), nft);
+    write_nft(&env, owner.clone(),  token_id.clone(), nft);
 
     remove_fight(
         env.clone(),
