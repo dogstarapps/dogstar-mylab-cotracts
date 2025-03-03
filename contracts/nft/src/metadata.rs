@@ -15,6 +15,7 @@ pub struct CardMetadata {
     pub category: Category, 
     pub price_xtar: i128, 
     pub price_terry: i128, 
+    pub token_id: u32,
 }
 
 /*
