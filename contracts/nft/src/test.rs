@@ -439,7 +439,7 @@ fn test_burn() {
 
     let nft = create_nft(e.clone(), &admin1, &config);
     nft.set_admin(&admin1);
-
+    
     let card: CardMetadata =  CardMetadata {
         name : String::from_str(&e, "Jed") , 
         base_uri: String::from_str(&e, "asdasdasd") ,
@@ -451,6 +451,7 @@ fn test_burn() {
         category: Category::Leader,
         price_xtar: 10000,
         price_terry: 400,
+        token_id: 1,
     };
 
     nft.create_metadata( &card, &1);

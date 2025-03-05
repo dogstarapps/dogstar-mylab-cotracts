@@ -21,3 +21,9 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+[profile.dev]
+opt-level=0
+
+[profile.test]
+opt-level=0

@@ -18,7 +18,7 @@ pub struct User {
     // pub borrowed_power: u32,
 }
 
-pub fn add_card_to_owner(env: Env, token_id: TokenId, user: Address )  -> Result<(),MyLabError>{
+pub fn add_card_to_owner(env: &Env, token_id: TokenId, user: Address )  -> Result<(),MyLabError>{
 
     if let Some(card) = read_nft(&env, user.clone(), token_id.clone()) {
 
@@ -31,13 +31,13 @@ pub fn add_card_to_owner(env: Env, token_id: TokenId, user: Address )  -> Result
         //user_card_ids_key.set (&env, &user_card_ids);
        
         //get prototype card 
-        let  card_metadata = read_metadata(&env,token_id.clone().0);
-        let mut card  = Card {
-            power : card_metadata.initial_power, 
-            locked_by_action: Action::None,
-        };
+        // let  card_metadata = read_metadata(&env,token_id.clone().0);
+        // let mut card  = Card {
+        //     power : card_metadata.initial_power, 
+        //     locked_by_action: Action::None,
+        // };
 
-        write_nft(&env, user, token_id, card);
+        // write_nft(&env, user, token_id, card);
         Ok(()) 
     } else {
         return  Err(MyLabError::NotNFT);

@@ -11,7 +11,7 @@ use crate::nft_info::{
 use crate::storage_types::{
     DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
-use crate::user_info::{get_user_level, read_owner_card, read_user, write_user, User};
+use crate::user_info::{add_card_to_owner, get_user_level, read_owner_card, read_user, write_user, User};
 use crate::metadata::{read_metadata,write_metadata, CardMetadata};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Vec, vec, String};
@@ -147,6 +147,7 @@ impl NFT {
         };
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
   
+        add_card_to_owner(&env, token_id.clone(), to.clone());
         // puchase by currency
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
