@@ -148,7 +148,7 @@ impl NFT {
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
   
         add_card_to_owner(&env, token_id.clone(), to.clone());
-        // puchase by currency
+        // // puchase by currency
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
         
@@ -166,8 +166,8 @@ impl NFT {
             token.transfer(&fee_payer.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.admin_terry += withdrawable_amount;
             balance.haw_ai_terry += haw_ai_amount;
-        
             
+
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount = (config.burnable_percentage as i128) * card_metadata.price_xtar / 100;
