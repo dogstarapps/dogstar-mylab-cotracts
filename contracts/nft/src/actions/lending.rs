@@ -28,7 +28,6 @@ pub fn write_lending(
     token_id: TokenId,
     lending: Lending,
 ) {
-    fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
