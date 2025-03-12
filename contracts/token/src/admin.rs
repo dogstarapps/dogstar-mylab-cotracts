@@ -6,7 +6,7 @@ use crate::storage_types::DataKey;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     pub locked_block: u32,
-    pub haw_ai_pot: Address,
+    pub mylab_contract: Address,
 }
 
 pub fn has_administrator(e: &Env) -> bool {
@@ -24,12 +24,6 @@ pub fn write_administrator(e: &Env, id: &Address) {
     e.storage().instance().set(&key, id);
 }
 
-pub fn is_whitelisted(e: &Env, member: &Address) -> bool {
-    e.storage()
-        .persistent()
-        .get(&DataKey::Whitelist(member.clone()))
-        .unwrap_or(false)
-}
 
 pub fn write_config(e: &Env, config: &Config) {
     let key = DataKey::Config;

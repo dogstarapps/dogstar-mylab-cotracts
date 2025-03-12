@@ -8,6 +8,7 @@ mod storage_types;
 mod actions;
 mod metadata;
 mod error; 
+mod token_interaction;
 
 mod test;
 

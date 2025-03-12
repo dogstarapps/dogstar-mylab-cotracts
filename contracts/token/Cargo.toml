@@ -4,6 +4,12 @@ description = "Soroban standard token contract"
 version = "0.0.6"
 edition = "2021"
 
+[features]
+default = []
+testutils = []
+used_linker = []
+
+
 [lib]
 crate-type = ["cdylib"]
 
