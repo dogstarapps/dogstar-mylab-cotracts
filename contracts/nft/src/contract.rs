@@ -11,13 +11,12 @@ use crate::nft_info::{
 use crate::storage_types::{
     DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
-use crate::user_info::{get_user_level, read_owner_card, read_user, write_user, User};
+use crate::user_info::{add_card_to_owner, get_user_level, read_owner_card, read_user, write_user, User};
 use crate::metadata::{read_metadata,write_metadata, CardMetadata};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Vec, vec, String};
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env,log};
 use soroban_token_sdk::TokenUtils;
-
 
 #[contract]
 pub struct NFT;
@@ -126,7 +125,7 @@ impl NFT {
         fee_payer.require_auth();
        
         let admin = read_administrator(&env);
-        let user = read_user(&env, fee_payer.clone());
+        let user: User = read_user(&env, fee_payer.clone());
         let to: Address = user.owner;
         let user_level = get_user_level(&env, to.clone());
       
@@ -147,7 +146,8 @@ impl NFT {
         };
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
   
-        // puchase by currency
+        add_card_to_owner(&env, token_id.clone(), to.clone());
+        // // puchase by currency
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
         
@@ -165,8 +165,8 @@ impl NFT {
             token.transfer(&fee_payer.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.admin_terry += withdrawable_amount;
             balance.haw_ai_terry += haw_ai_amount;
-        
             
+
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount = (config.burnable_percentage as i128) * card_metadata.price_xtar / 100;
@@ -282,7 +282,7 @@ impl NFT {
         read_metadata(e, id)
     }
 
-    pub fn create_user (e: Env, fee_payer: Address, owner: Address){
+    pub fn create_user (e: Env, fee_payer: Address, owner: Address) {
         //it should be admin
         let user : User = User {
             owner,
@@ -330,7 +330,28 @@ impl NFT {
         player_cards
     }
 
+    pub fn add_power_to_card(e: &Env, player: Address, token_id: u32, amount: u32) {
+        let card = read_nft(e, player.clone(), TokenId(token_id)).unwrap();
+
+        let new_card = Card {
+            power: card.power + amount,
+            locked_by_action: card.locked_by_action,
+        };
+        write_nft(e, player.clone(), TokenId(token_id), new_card);
+
+        let user = read_user(e, player.clone());
+        let new_user = User {
+            owner: user.owner,
+            power: user.power - amount,
+        };
+
+        write_user(e, player.clone(), new_user);
+    }
+    pub fn read_user(e: &Env, player: Address) -> User {
+        read_user(e, player.clone())
+    }
 }
+
 // Stake
 #[contractimpl]
 impl NFT {

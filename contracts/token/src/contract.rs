@@ -173,12 +173,12 @@ impl token::Interface for Token {
 
     fn transfer(e: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
-        let config = read_config(&e);
-        let current_block = e.ledger().sequence();
+        // let config = read_config(&e);
+        // let current_block = e.ledger().sequence();
 
-        if !is_whitelisted(&e, &from) && current_block < config.locked_block {
-            panic!("Caller is not whitelisted");
-        }
+        // if !is_whitelisted(&e, &from) && current_block < config.locked_block {
+        //     panic!("Caller is not whitelisted");
+        // }
 
         check_nonnegative_amount(amount);
 

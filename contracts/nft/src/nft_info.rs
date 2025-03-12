@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, log, Address, Env};
 
 use crate::storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
@@ -58,6 +58,7 @@ impl CardInfo {
 }
 
 pub fn write_nft(env: &Env, owner: Address, token_id: TokenId, card: Card) {
+    log!(&env, "write_nft >> Write nft for {}, token id {}", owner.clone(), token_id.clone());
     let key = DataKey::Card( owner, token_id);
     env.storage().persistent().set(&key, &card);
     env.storage()
@@ -66,6 +67,7 @@ pub fn write_nft(env: &Env, owner: Address, token_id: TokenId, card: Card) {
 }
 
 pub fn read_nft(env: &Env, owner: Address,  token_id: TokenId,) -> Option<Card> {
+    log!(&env, "read_nft >> Read nft for {}, token id {}", owner.clone(), token_id.clone());
     let key = DataKey::Card(owner, token_id);
     env.storage()
         .persistent()
