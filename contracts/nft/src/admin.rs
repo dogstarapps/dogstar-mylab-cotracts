@@ -85,10 +85,6 @@ pub fn transfer_terry(e: &Env, to: Address, amount: i128) {
     token_admin_client.transfer(&e.current_contract_address(), &to, &amount);
 }
 
-
-
-
-
 pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
     let token_admin_client = StellarAssetClient::new(&e, &token);
     token_admin_client.mint(&to, &amount);

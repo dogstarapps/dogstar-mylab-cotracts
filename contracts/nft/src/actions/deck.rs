@@ -23,7 +23,9 @@ pub fn write_deck(env: Env, fee_payer: Address, deck: Deck) {
     env.storage().persistent().set(&key, &deck);
     env.storage()
         .persistent()
-        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);  
+
+    
 
     let key = DataKey::Decks;
     let mut decks = read_decks(env.clone());
