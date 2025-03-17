@@ -12,8 +12,6 @@ pub struct Lending {
     pub category: Category,
     pub token_id: TokenId,
     pub power: u32,
-    pub interest_rate: u32,
-    pub duration: u32,
     pub is_borrowed: bool,
     pub borrower: Address,
     pub collateral_category: Category,
@@ -107,13 +105,15 @@ pub fn lend(
     category: Category,
     token_id: TokenId,
     power: u32,
-    interest_rate: u32,
-    duration: u32,
 ) {
     fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
-    assert!(category == Category::Resource, "Invalid Category to lend");
+    assert!(
+        category == Category::Resource ||
+        category == Category::Leader,
+        "Invalid Category to lend"
+    );
 
     let mut nft = read_nft(
         &env.clone(),
@@ -140,8 +140,6 @@ pub fn lend(
         category: category.clone(),
         token_id: token_id.clone(),
         power,
-        interest_rate,
-        duration,
         is_borrowed: false,
         borrower: owner.clone(),
         collateral_category: category.clone(),
@@ -254,120 +252,120 @@ pub fn lendings(env: Env) -> Vec<Lending> {
 }
 
 pub fn repay(env: Env, fee_payer: Address, lender: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let borrower = read_user(&env, fee_payer.clone()).owner;
+    // fee_payer.require_auth();
+    // let borrower = read_user(&env, fee_payer.clone()).owner;
 
-    let mut lending = read_lending(
-        env.clone(),
-        lender.clone(),
-        category.clone(),
-        token_id.clone(),
-    );
-    let current_block = env.ledger().sequence();
-    let time_elapsed = current_block - lending.borrowed_block;
-    let interest_amount =
-        lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
+    // let mut lending = read_lending(
+    //     env.clone(),
+    //     lender.clone(),
+    //     category.clone(),
+    //     token_id.clone(),
+    // );
+    // let current_block = env.ledger().sequence();
+    // let time_elapsed = current_block - lending.borrowed_block;
+    // let interest_amount =
+    //     lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
 
-    let mut lender_nft = read_nft(
-        &env.clone(),
-        lender.clone(),
-        token_id.clone(),
-    ).unwrap();
-    let mut borrower_nft = read_nft(
-        &env.clone(),
-        borrower.clone(),
-        lending.collateral_token_id.clone(),
-    ).unwrap();
+    // let mut lender_nft = read_nft(
+    //     &env.clone(),
+    //     lender.clone(),
+    //     token_id.clone(),
+    // ).unwrap();
+    // let mut borrower_nft = read_nft(
+    //     &env.clone(),
+    //     borrower.clone(),
+    //     lending.collateral_token_id.clone(),
+    // ).unwrap();
 
-    lender_nft.power += interest_amount;
+    // lender_nft.power += interest_amount;
 
-    borrower_nft.power -= interest_amount;
-    borrower_nft.locked_by_action = Action::None;
+    // borrower_nft.power -= interest_amount;
+    // borrower_nft.locked_by_action = Action::None;
 
-    write_nft(
-        &env.clone(),
-        lender.clone(),
-        token_id.clone(),
-        lender_nft,
-    );
+    // write_nft(
+    //     &env.clone(),
+    //     lender.clone(),
+    //     token_id.clone(),
+    //     lender_nft,
+    // );
 
-    write_nft(
-        &env.clone(),
-        borrower.clone(),
-        lending.collateral_token_id.clone(),
-        borrower_nft,
-    );
+    // write_nft(
+    //     &env.clone(),
+    //     borrower.clone(),
+    //     lending.collateral_token_id.clone(),
+    //     borrower_nft,
+    // );
 
-    lending.is_borrowed = false;
+    // lending.is_borrowed = false;
 
-    write_lending(
-        env.clone(),
-        lender.clone(),
-        category.clone(),
-        token_id.clone(),
-        lending,
-    );
+    // write_lending(
+    //     env.clone(),
+    //     lender.clone(),
+    //     category.clone(),
+    //     token_id.clone(),
+    //     lending,
+    // );
 }
 
 pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let lender = read_user(&env, fee_payer).owner;
+    // fee_payer.require_auth();
+    // let lender = read_user(&env, fee_payer).owner;
 
-    let lending = read_lending(
-        env.clone(),
-        lender.clone(),
-        category.clone(),
-        token_id.clone(),
-    );
+    // let lending = read_lending(
+    //     env.clone(),
+    //     lender.clone(),
+    //     category.clone(),
+    //     token_id.clone(),
+    // );
 
-    let current_block = env.ledger().sequence();
+    // let current_block = env.ledger().sequence();
 
-    assert!(
-        lending.is_borrowed == false || lending.borrowed_block + lending.duration <= current_block,
-        "Borrowed Duration"
-    );
+    // assert!(
+    //     lending.is_borrowed == false || lending.borrowed_block + lending.duration <= current_block,
+    //     "Borrowed Duration"
+    // );
 
-    if lending.is_borrowed {
-        let current_block = env.ledger().sequence();
-        let time_elapsed = current_block - lending.borrowed_block;
-        let interest_amount =
-            lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
+    // if lending.is_borrowed {
+    //     let current_block = env.ledger().sequence();
+    //     let time_elapsed = current_block - lending.borrowed_block;
+    //     let interest_amount =
+    //         lending.power * lending.interest_rate * time_elapsed * 100 / lending.duration;
 
-        let mut lender_nft = read_nft(
-            &env.clone(),
-            lender.clone(),
-            token_id.clone(),
-        ).unwrap();
-        let mut borrower_nft = read_nft(
-            &env.clone(),
-            lending.borrower.clone(),
-            lending.collateral_token_id.clone(),
-        ).unwrap();
+    //     let mut lender_nft = read_nft(
+    //         &env.clone(),
+    //         lender.clone(),
+    //         token_id.clone(),
+    //     ).unwrap();
+    //     let mut borrower_nft = read_nft(
+    //         &env.clone(),
+    //         lending.borrower.clone(),
+    //         lending.collateral_token_id.clone(),
+    //     ).unwrap();
 
-        lender_nft.power += interest_amount;
+    //     lender_nft.power += interest_amount;
 
-        borrower_nft.power -= interest_amount;
-        borrower_nft.locked_by_action = Action::None;
+    //     borrower_nft.power -= interest_amount;
+    //     borrower_nft.locked_by_action = Action::None;
 
-        write_nft(
-            &env.clone(),
-            lender.clone(),
-            token_id.clone(),
-            lender_nft,
-        );
+    //     write_nft(
+    //         &env.clone(),
+    //         lender.clone(),
+    //         token_id.clone(),
+    //         lender_nft,
+    //     );
 
-        write_nft(
-            &env.clone(),
-            lending.borrower.clone(),
-            lending.collateral_token_id.clone(),
-            borrower_nft,
-        );
-    }
+    //     write_nft(
+    //         &env.clone(),
+    //         lending.borrower.clone(),
+    //         lending.collateral_token_id.clone(),
+    //         borrower_nft,
+    //     );
+    // }
 
-    remove_lending(
-        env.clone(),
-        lender.clone(),
-        category.clone(),
-        token_id.clone(),
-    );
+    // remove_lending(
+    //     env.clone(),
+    //     lender.clone(),
+    //     category.clone(),
+    //     token_id.clone(),
+    // );
 }

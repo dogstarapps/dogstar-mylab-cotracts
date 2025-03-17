@@ -438,8 +438,6 @@ impl NFT {
         category: Category,
         token_id: TokenId,
         power: u32,
-        interest_rate: u32,
-        duration: u32,
     ) {
         lending::lend(
             env,
@@ -447,8 +445,6 @@ impl NFT {
             category,
             token_id,
             power,
-            interest_rate,
-            duration,
         )
     }
 
