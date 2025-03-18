@@ -323,6 +323,7 @@ fn test_stake() {
     // mint_token(&e, config.terry_token, user1.clone(), 100);
 
     // assert!(e.ledger().sequence() == 0);
+    // nft.stake(&user1, &Category::Leader, &TokenId(1), &0);
 }
 
 // #[test]

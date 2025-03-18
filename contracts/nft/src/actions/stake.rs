@@ -196,6 +196,7 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
 
     let interest_amount = stake.power * stake.interest_percentage / 100;
     nft.power += stake.power + interest_amount;
+    nft.locked_by_action = Action::None;
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
