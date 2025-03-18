@@ -360,7 +360,6 @@ impl NFT {
         fee_payer: Address,
         category: Category,
         token_id: TokenId,
-        stake_power: u32,
         period_index: u32,
     ) {
         stake::stake(
@@ -368,7 +367,6 @@ impl NFT {
             fee_payer,
             category,
             token_id,
-            stake_power,
             period_index,
         )
     }

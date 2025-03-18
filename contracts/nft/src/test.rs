@@ -1,6 +1,9 @@
 #![cfg(test)]
 extern crate std;
 
+use log::{ info, warn };
+use env_logger;
+
 use crate::{
     actions::{fight, SidePosition}, admin::Config, contract::NFT, metadata::{write_metadata, CardMetadata}, nft_info::{write_nft, Action, CardInfo, Category, Currency}, storage_types::TokenId, user_info::read_user, NFTClient
 };
@@ -8,13 +11,14 @@ use soroban_sdk::{events, token::{StellarAssetClient, TokenClient}, String};
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, log};
 use crate::nft_info::Card;
 
+use crate::{ admin::{ transfer_terry } };
+
 fn create_nft<'a>(e: Env, admin: &Address, config: &Config) -> NFTClient<'a> {
     let nft: NFTClient = NFTClient::new(&e, &e.register_contract(None, NFT {}));
     nft.initialize(admin, config);
     
     nft
 }
-
 
 
 fn generate_config(e: &Env) -> Config {
@@ -27,9 +31,9 @@ fn generate_config(e: &Env) -> Config {
         burnable_percentage: 50,
         how_ai_percentage: 50,
         terry_per_power: 100,
-        stake_periods: vec![&e.clone(), 0, 200, 300],
-        stake_interest_percentages: vec![&e.clone(), 1, 2, 3],
-        power_action_fee: 1,
+        stake_periods: vec![&e.clone(), 60, 120, 180],
+        stake_interest_percentages: vec![&e.clone(), 5, 10, 15],
+        power_action_fee: 2,
         burn_receive_percentage: 50,
     }
 }
@@ -241,80 +245,85 @@ fn test_add_power() {
 //     write_nft(&e, user, TokenId(101), card);
 // }
 
-// #[test]
-// fn test_stake() {
-//     let e = Env::default();
-//     e.mock_all_auths();
+#[test]
+fn test_stake() {
+    let e = Env::default();
+    e.mock_all_auths();
+    
+    std::println!("hello test stake");
 
-//     let admin1 = Address::generate(&e);
-//     let user1 = Address::generate(&e);
+    let admin1 = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    // Generate config
+    let mut config = generate_config(&e);
 
-//     // Generate config
-//     let mut config = generate_config(&e);
+    let terry_token = e.register_stellar_asset_contract(admin1.clone());
+    config.terry_token = terry_token.clone();
+    let terry_token_client = TokenClient::new(&e, &terry_token);
 
-//     let terry_token = e.register_stellar_asset_contract(admin1.clone());
-//     config.terry_token = terry_token.clone();
-//     let terry_token_client = TokenClient::new(&e, &terry_token);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
-//     let nft = create_nft(e.clone(), &admin1, &config);
+    // Mint terry tokens to user1
+    mint_token(&e, config.terry_token.clone(), user1.clone(), 100000);
+    assert_eq!(terry_token_client.balance(&user1), 100000);
 
-//     // Mint terry tokens to user1
-//     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
-//     assert_eq!(terry_token_client.balance(&user1), 1000);
+    // Set user level
+    //nft.set_user_level(&user1.clone(), &1);
 
-//     // Set user level
-//     //nft.set_user_level(&user1.clone(), &1);
+    let metadata = create_metadata(&e);
+    nft.create_metadata(&metadata, &1);
 
-//     // Mint token 1 to user1
-//     assert!(nft.exists(&user1,  &TokenId(1)) == false);
-//     nft.mint(&user1, &TokenId(1), &1, &Currency::Terry);
-//     assert!(nft.exists(&user1,  &TokenId(1)) == true);
+    // Mint token 1 to user1
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
 
-//     let card_info = CardInfo::get_default_card(Category::Leader);
+    nft.mint(&user1, &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
-//     // Stake
-//     let stake_power = 100;
-//     nft.stake(&user1, &Category::Leader, &TokenId(1), &stake_power, &0);
-//     let card = nft.card(&user1,  &TokenId(1)).unwrap();
-//     let power_action_fee = config.power_action_fee * stake_power / 100;
-//     assert!(
-//         card.locked_by_action == Action::Stake
-//             && card.power + stake_power == card_info.initial_power
-//             && power_action_fee == 1
-//     );
-//     let balance = nft.admin_balance();
-//     assert!(balance.haw_ai_power == power_action_fee);
+    let card_info = CardInfo::get_default_card(Category::Leader);
 
-//     let stake = nft.read_stake(&user1, &Category::Leader, &TokenId(1));
-//     assert!(stake.power == stake_power - power_action_fee);
+    // Stake
+    let mut card = nft.card(&user1,  &TokenId(1)).unwrap();
+    let power_action_fee = config.power_action_fee * card.power / 100;
+    nft.stake(&user1, &Category::Leader, &TokenId(1), &0);
+    card = nft.card(&user1,  &TokenId(1)).unwrap();
+    
+    assert!(card.locked_by_action == Action::Stake);
+    assert_eq!(card.power, 0);
+    assert_eq!(power_action_fee, 20);
 
-//     // Increase Stake Power
-//     let increase_power = 200;
-//     nft.increase_stake_power(&user1, &Category::Leader, &TokenId(1), &increase_power);
-//     let card = nft.card(&user1,  &TokenId(1)).unwrap();
-//     let increased_power_action_fee = config.power_action_fee * increase_power / 100;
-//     assert!(
-//         card.locked_by_action == Action::Stake
-//             && card.power + stake_power + increase_power == card_info.initial_power
-//             && increased_power_action_fee == 2
-//     );
-//     let balance = nft.admin_balance();
-//     assert!(balance.haw_ai_power == power_action_fee + increased_power_action_fee);
+    let balance = nft.admin_balance();
+    assert!(balance.haw_ai_power == power_action_fee);
 
-//     let stake = nft.read_stake(&user1, &Category::Leader, &TokenId(1));
-//     assert!(
-//         stake.power == stake_power + increase_power - increased_power_action_fee - power_action_fee
-//     );
+    let stake = nft.read_stake(&user1, &Category::Leader, &TokenId(1));
+    assert_eq!(stake.power, 1000 - power_action_fee);
 
-//     // Unstake
-//     nft.unstake(&user1, &Category::Leader, &TokenId(1));
+    // Increase Stake Power
+    // let increase_power = 200;
+    // nft.increase_stake_power(&user1, &Category::Leader, &TokenId(1), &increase_power);
+    // let card = nft.card(&user1,  &TokenId(1)).unwrap();
+    // let increased_power_action_fee = config.power_action_fee * increase_power / 100;
+    // assert!(
+    //     card.locked_by_action == Action::Stake
+    //         && card.power + stake_power + increase_power == card_info.initial_power
+    //         && increased_power_action_fee == 2
+    // );
+    // let balance = nft.admin_balance();
+    // assert!(balance.haw_ai_power == power_action_fee + increased_power_action_fee);
 
-//     assert!(nft.config().terry_token == config.terry_token);
-//     // nft.mint_token(&config.terry_token, &user1, &100);
-//     mint_token(&e, config.terry_token, user1.clone(), 100);
+    // let stake = nft.read_stake(&user1, &Category::Leader, &TokenId(1));
+    // assert!(
+    //     stake.power == stake_power + increase_power - increased_power_action_fee - power_action_fee
+    // );
 
-//     assert!(e.ledger().sequence() == 0);
-// }
+    // Unstake
+    nft.unstake(&user1, &Category::Leader, &TokenId(1));
+
+    // assert!(nft.config().terry_token == config.terry_token);
+    // // nft.mint_token(&config.terry_token, &user1, &100);
+    // mint_token(&e, config.terry_token, user1.clone(), 100);
+
+    // assert!(e.ledger().sequence() == 0);
+}
 
 // #[test]
 // fn test_fight() {
@@ -608,3 +617,35 @@ fn test_add_power() {
 //     let price = nft.currency_price(&config.oracle_contract_id );//&fight::Currency::BTC);
 //     assert!(price == 0);
 // }
+
+#[test]
+fn test_transfer_terry() {
+    let e = Env::default();
+    e.mock_all_auths();
+    log!(&e, "test nft mint function");
+
+    let admin1 = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    let mut config = generate_config(&e);
+
+    let terry_token = e.register_stellar_asset_contract(admin1.clone());
+    config.terry_token = terry_token.clone();
+    let xtar_token = e.register_stellar_asset_contract(admin1.clone());
+    config.xtar_token = xtar_token.clone();
+    let terry_token_client = TokenClient::new(&e, &terry_token);
+    let xtar_token_client = TokenClient::new(&e, &xtar_token);
+    
+    // Mint terry tokens to user1
+    mint_token(&e, config.terry_token.clone(), user1.clone(), 100000);
+    assert_eq!(terry_token_client.balance(&user1), 100000);
+
+    // Mint xtar tokens to user2
+    mint_token(&e, config.xtar_token.clone(), user2.clone(), 100000);
+    assert_eq!(xtar_token_client.balance(&user2), 100000);
+
+    transfer_terry(&e, user1.clone(), 1000);
+
+    assert_eq!(terry_token_client.balance(&user1), 101000);
+}

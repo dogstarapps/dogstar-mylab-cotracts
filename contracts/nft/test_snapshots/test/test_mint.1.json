@@ -921,7 +921,7 @@
                         "symbol": "power_action_fee"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 2
                       }
                     },
                     {
@@ -931,13 +931,13 @@
                       "val": {
                         "vec": [
                           {
-                            "u32": 1
+                            "u32": 5
                           },
                           {
-                            "u32": 2
+                            "u32": 10
                           },
                           {
-                            "u32": 3
+                            "u32": 15
                           }
                         ]
                       }
@@ -949,13 +949,13 @@
                       "val": {
                         "vec": [
                           {
-                            "u32": 0
+                            "u32": 60
                           },
                           {
-                            "u32": 200
+                            "u32": 120
                           },
                           {
-                            "u32": 300
+                            "u32": 180
                           }
                         ]
                       }
@@ -3011,7 +3011,7 @@
                         "symbol": "power_action_fee"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 2
                       }
                     },
                     {
@@ -3021,13 +3021,13 @@
                       "val": {
                         "vec": [
                           {
-                            "u32": 1
+                            "u32": 5
                           },
                           {
-                            "u32": 2
+                            "u32": 10
                           },
                           {
-                            "u32": 3
+                            "u32": 15
                           }
                         ]
                       }
@@ -3039,13 +3039,13 @@
                       "val": {
                         "vec": [
                           {
-                            "u32": 0
+                            "u32": 60
                           },
                           {
-                            "u32": 200
+                            "u32": 120
                           },
                           {
-                            "u32": 300
+                            "u32": 180
                           }
                         ]
                       }
@@ -3771,7 +3771,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Write nft for {}, token id {}"
+                  "string": "write_nft >> Write nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -3825,7 +3825,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Read nft for {}, token id {}"
+                  "string": "read_nft >> Read nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -3859,7 +3859,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Found card {}"
+                  "string": "add_card_to_owner >> Found card {}"
                 },
                 {
                   "map": [
@@ -3934,10 +3934,20 @@
             "data": {
               "vec": [
                 {
-                  "string": "read_owner_card >> Data key Owner owned ids {}"
+                  "string": "read_owner_card >> Data key Owner owned ids {}, {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "OwnerOwnedCardIds"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    }
+                  ]
                 }
               ]
             }
@@ -3965,6 +3975,60 @@
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "000000000000000000000000000000000000000000000000000000000000000a",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "log"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "string": "Card found for owner {}"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "000000000000000000000000000000000000000000000000000000000000000a",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "log"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "string": "add_card_to_owner >> User card ids {}"
+                },
+                {
+                  "vec": []
                 }
               ]
             }
@@ -4408,10 +4472,20 @@
             "data": {
               "vec": [
                 {
-                  "string": "read_owner_card >> Data key Owner owned ids {}"
+                  "string": "read_owner_card >> Data key Owner owned ids {}, {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "OwnerOwnedCardIds"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    }
+                  ]
                 }
               ]
             }
@@ -4462,7 +4536,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Read nft for {}, token id {}"
+                  "string": "read_nft >> Read nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -4687,7 +4761,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Read nft for {}, token id {}"
+                  "string": "read_nft >> Read nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -5336,7 +5410,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Write nft for {}, token id {}"
+                  "string": "write_nft >> Write nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -5390,7 +5464,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Read nft for {}, token id {}"
+                  "string": "read_nft >> Read nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -5424,7 +5498,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Found card {}"
+                  "string": "add_card_to_owner >> Found card {}"
                 },
                 {
                   "map": [
@@ -5499,10 +5573,20 @@
             "data": {
               "vec": [
                 {
-                  "string": "read_owner_card >> Data key Owner owned ids {}"
+                  "string": "read_owner_card >> Data key Owner owned ids {}, {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "OwnerOwnedCardIds"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                    }
+                  ]
                 }
               ]
             }
@@ -5530,6 +5614,60 @@
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "000000000000000000000000000000000000000000000000000000000000000a",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "log"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "string": "Card found for owner {}"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "000000000000000000000000000000000000000000000000000000000000000a",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "log"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "string": "add_card_to_owner >> User card ids {}"
+                },
+                {
+                  "vec": []
                 }
               ]
             }
@@ -5921,7 +6059,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "Read nft for {}, token id {}"
+                  "string": "read_nft >> Read nft for {}, token id {}"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
