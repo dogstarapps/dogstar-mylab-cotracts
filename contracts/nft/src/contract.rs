@@ -451,31 +451,26 @@ impl NFT {
     pub fn borrow(
         env: Env,
         borrower: Address,
-        lender: Address,
         category: Category,
         token_id: TokenId,
-        collateral_category: Category,
-        collateral_token_id: TokenId,
+        power: u32,
     ) {
         lending::borrow(
             env,
             borrower,
-            lender,
             category,
             token_id,
-            collateral_category,
-            collateral_token_id,
+            power,
         )
     }
 
     pub fn repay(
         env: Env,
         borrower: Address,
-        lender: Address,
         category: Category,
         token_id: TokenId,
     ) {
-        lending::repay(env, borrower, lender, category, token_id)
+        lending::repay(env, borrower, category, token_id)
     }
 
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
