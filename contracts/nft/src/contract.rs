@@ -434,14 +434,14 @@ impl NFT {
 impl NFT {
     pub fn lend(
         env: Env,
-        owner: Address,
+        lender: Address,
         category: Category,
         token_id: TokenId,
         power: u32,
     ) {
         lending::lend(
             env,
-            owner,
+            lender,
             category,
             token_id,
             power,

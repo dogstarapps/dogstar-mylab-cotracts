@@ -199,12 +199,12 @@ pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
         .unwrap_or(vec![&env.clone()])
 }
 
-fn calculate_apy(total_demand: u64, total_offer: u64, avg_duration: u64, alpha: u64) -> f64 {
-    let apy_min = 0;
-    let apy_max = 300_000;
-    let utilization = total_demand as f64 / total_offer as f64;
-    let factor_time = 1.0 / (1.0 + alpha as f64 * avg_duration as f64);
-    apy_min as f64 + (apy_max as f64 - apy_min as f64) * utilization * factor_time
+fn calculate_apy(total_demand: u64, total_offer: u64, avg_duration: u64, alpha: u64) -> u64 {
+    let apy_min = 0u64;
+    let apy_max = 300_000u64;
+    let utilization = 1_000_000 * total_demand / total_offer;
+    let factor_time = 1_000_000 / (1 + alpha * avg_duration);
+    apy_min + (apy_max - apy_min) * utilization * factor_time
 }
 
 pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
@@ -362,8 +362,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
         avg_duration,
         time_elapse,
     );
-    let interest_amount =
-        (apy * borrowing.power as f64 * time_elapse as f64 / 3600f64 / 100f64) as u32;
+    let interest_amount = (apy * borrowing.power as u64 * time_elapse) / 1_000_000;
     state.total_interest += interest_amount as u64;
 
     write_state(&env, &state);
@@ -372,7 +371,12 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
-    user.power -= borrowing.power + interest_amount;
+    assert!(
+        user.power >= borrowing.power + interest_amount as u32,
+        "Insufficient fund to repay",
+    );
+
+    user.power -= borrowing.power + interest_amount as u32;
 
     write_user(&env, owner.clone(), user);
     
@@ -433,14 +437,13 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         avg_duration,
         time_elapse,
     );
-    let interest_amount =
-        (apy * lending.power as f64 * time_elapse as f64 / 3600f64 / 100f64) as u32;
+    let interest_amount = (apy * lending.power as u64 * time_elapse) / 1_000_000;
 
-    if state.total_interest < interest_amount as u64 {
+    if state.total_interest < interest_amount {
         liquidate(env.clone(), &mut state);
     }
 
-    state.total_interest -= interest_amount as u64;
+    state.total_interest -= interest_amount;
 
     write_state(&env, &state);
 
@@ -448,7 +451,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
-    user.power += interest_amount;
+    user.power += interest_amount as u32;
 
     write_user(&env, owner.clone(), user);
 
