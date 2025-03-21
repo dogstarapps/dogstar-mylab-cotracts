@@ -204,7 +204,7 @@ fn calculate_apy(total_demand: u64, total_offer: u64, avg_duration: u64, alpha: 
     let apy_max = 300_000u64;
     let utilization = 1_000_000 * total_demand / total_offer;
     let factor_time = 1_000_000 / (1 + alpha * avg_duration);
-    apy_min + (apy_max - apy_min) * utilization * factor_time
+    apy_min + (apy_max - apy_min) * utilization * factor_time / 1_000_000_000_000
 }
 
 pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
@@ -353,6 +353,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     let mut state = read_state(&env);
 
     state.total_demand -= borrowing.power as u64;
+
     let current_block = env.ledger().sequence();
     let time_elapse = current_block - borrowing.borrowed_at;
     let mut avg_duration = 0u64;
@@ -431,6 +432,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     let mut state = read_state(&env);
 
     state.total_offer -= lending.power as u64;
+
     let current_block = env.ledger().sequence();
     let time_elapse = current_block - lending.lent_at;
     let mut avg_duration = 0u64;
