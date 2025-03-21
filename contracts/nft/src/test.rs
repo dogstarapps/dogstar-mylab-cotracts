@@ -32,6 +32,7 @@ fn generate_config(e: &Env) -> Config {
         stake_interest_percentages: vec![&e.clone(), 1, 2, 3],
         power_action_fee: 1,
         burn_receive_percentage: 50,
+        apy_alpha: 10,
     }
 }
 

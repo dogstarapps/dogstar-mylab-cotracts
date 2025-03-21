@@ -18,6 +18,7 @@ pub struct Config {
     pub stake_interest_percentages: Vec<u32>,
     pub power_action_fee: u32,
     pub burn_receive_percentage: u32,
+    pub apy_alpha: u32,
 }
 
 #[contracttype]
