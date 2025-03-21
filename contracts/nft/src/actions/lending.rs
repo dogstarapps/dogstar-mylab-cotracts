@@ -15,7 +15,7 @@ pub struct Lending {
     pub category: Category,
     pub token_id: TokenId,
     pub power: u32,
-    pub lent_at: u64,
+    pub lent_at: u32,
 }
 
 #[contracttype]
@@ -25,7 +25,7 @@ pub struct Borrowing {
     pub category: Category,
     pub token_id: TokenId,
     pub power: u32,
-    pub borrowed_at: u64,
+    pub borrowed_at: u32,
 }
 
 pub fn write_lending(
@@ -250,7 +250,7 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
         category: category.clone(),
         token_id: token_id.clone(),
         power,
-        lent_at: env.ledger().timestamp(),
+        lent_at: env.ledger().sequence(),
     };
 
     write_lending(
@@ -313,7 +313,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         category: category.clone(),
         token_id: token_id.clone(),
         power: power.clone(),
-        borrowed_at: env.ledger().timestamp(),
+        borrowed_at: env.ledger().sequence(),
     };
 
     write_borrowing(
@@ -348,11 +348,13 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
         token_id.clone(),
     );
 
+    let config = read_config(&env);
+
     let mut state = read_state(&env);
 
     state.total_demand -= borrowing.power as u64;
-    let current_timestamp = env.ledger().timestamp();
-    let time_elapse = current_timestamp - borrowing.borrowed_at;
+    let current_block = env.ledger().sequence();
+    let time_elapse = current_block - borrowing.borrowed_at;
     let mut avg_duration = 0u64;
     if state.total_loan_count > 0 {
         avg_duration = state.total_loan_amount / state.total_loan_count;
@@ -361,9 +363,9 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
         state.total_demand,
         state.total_offer,
         avg_duration,
-        time_elapse,
+        config.apy_alpha as u64,
     );
-    let interest_amount = (apy * borrowing.power as u64 * time_elapse) / 1_000_000;
+    let interest_amount = (apy * borrowing.power as u64 * time_elapse as u64) / 1_000_000;
     state.total_interest += interest_amount as u64;
 
     write_state(&env, &state);
@@ -424,11 +426,13 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         token_id.clone(),
     );
 
+    let config = read_config(&env);
+
     let mut state = read_state(&env);
 
     state.total_offer -= lending.power as u64;
-    let current_timestamp = env.ledger().timestamp();
-    let time_elapse = current_timestamp - lending.lent_at;
+    let current_block = env.ledger().sequence();
+    let time_elapse = current_block - lending.lent_at;
     let mut avg_duration = 0u64;
     if state.total_loan_count > 0 {
         avg_duration = state.total_loan_amount / state.total_loan_count;
@@ -437,9 +441,9 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
         state.total_demand,
         state.total_offer,
         avg_duration,
-        time_elapse,
+        config.apy_alpha as u64,
     );
-    let interest_amount = (apy * lending.power as u64 * time_elapse) / 1_000_000;
+    let interest_amount = (apy * lending.power as u64 * time_elapse as u64) / 1_000_000;
 
     if state.total_interest < interest_amount {
         liquidate(env.clone(), &mut state);
