@@ -291,7 +291,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         "Exceed power amount to borrow"
     );
 
-    state.total_offer += power as u64;
+    state.total_demand += power as u64;
 
     write_state(&env, &state);
 
@@ -350,6 +350,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     let mut state = read_state(&env);
 
+    state.total_demand -= borrowing.power as u64;
     let current_timestamp = env.ledger().timestamp();
     let time_elapse = current_timestamp - borrowing.borrowed_at;
     let mut avg_duration = 0u64;
@@ -425,6 +426,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     let mut state = read_state(&env);
 
+    state.total_offer -= lending.power as u64;
     let current_timestamp = env.ledger().timestamp();
     let time_elapse = current_timestamp - lending.lent_at;
     let mut avg_duration = 0u64;
