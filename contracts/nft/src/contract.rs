@@ -3,7 +3,7 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, transfer_terry, mint_token, read_administrator, read_balance, read_config, update_level, write_administrator, write_balance, write_config, Balance, Config
+    add_level, has_administrator, mint_token, read_administrator, read_balance, read_config, read_state, transfer_terry, update_level, write_administrator, write_balance, write_config, Balance, Config, State
 };
 use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
@@ -249,6 +249,9 @@ impl NFT {
         read_balance(&env)
     }
 
+    pub fn admin_state(env: &Env) -> State {
+        read_state(&env)
+    }
 
     pub fn transfer_terry(env: Env, to: Address, amount: i128) {
         transfer_terry(&env, to, amount)
