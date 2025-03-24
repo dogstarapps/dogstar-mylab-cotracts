@@ -203,7 +203,7 @@ fn calculate_apy(total_demand: u64, total_offer: u64, avg_duration: u64, alpha: 
     let apy_min = 0u64;
     let apy_max = 300_000u64;
     let utilization = 1_000_000 * total_demand / total_offer;
-    let factor_time = 1_000_000 / (1 + alpha * avg_duration);
+    let factor_time = 1_000_000_000_000 / (1_000_000 + alpha * avg_duration);
     apy_min + (apy_max - apy_min) * utilization * factor_time / 1_000_000_000_000
 }
 
