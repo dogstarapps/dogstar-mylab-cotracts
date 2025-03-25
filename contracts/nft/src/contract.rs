@@ -425,6 +425,10 @@ impl NFT {
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
         fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
     }
+
+    pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
+        fight::read_fight(env, fee_payer, category, token_id)
+    }
 }
 
 // Lend & Borrow
