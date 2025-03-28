@@ -328,48 +328,51 @@ fn test_stake() {
     // nft.stake(&user1, &Category::Leader, &TokenId(1), &0);
 }
 
-// #[test]
-// fn test_fight() {
-//     let e = Env::default();
-//     e.mock_all_auths();
+#[test]
+fn test_fight() {
+    let e = Env::default();
+    e.mock_all_auths();
 
-//     let admin1 = Address::generate(&e);
-//     let user1 = Address::generate(&e);
+    let admin1 = Address::generate(&e);
+    let user1 = Address::generate(&e);
 
-//     // Generate config
-//     let mut config = generate_config(&e);
+    // Generate config
+    let mut config = generate_config(&e);
 
-//     let terry_token = e.register_stellar_asset_contract(admin1.clone());
-//     config.terry_token = terry_token.clone();
-//     let terry_token_client = TokenClient::new(&e, &terry_token);
+    let terry_token = e.register_stellar_asset_contract(admin1.clone());
+    config.terry_token = terry_token.clone();
+    let terry_token_client = TokenClient::new(&e, &terry_token);
 
-//     let nft = create_nft(e.clone(), &admin1, &config);
+    let nft = create_nft(e.clone(), &admin1, &config);
 
-//     // Mint terry tokens to user1
-//     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
-//     assert_eq!(terry_token_client.balance(&user1), 1000);
+    // Mint terry tokens to user1
+    mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
+    assert_eq!(terry_token_client.balance(&user1), 1000);
 
-//     // Set user level
-//     //nft.set_user_level(&user1.clone(), &1);
+    // Set user level
+    //nft.set_user_level(&user1.clone(), &1);
 
-//     // Mint token 1 to user1
-//     assert!(nft.exists(&user1,  &TokenId(1)) == false);
-//     nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
-//     assert!(nft.exists(&user1,  &TokenId(1)) == true);
+    let metadata = create_metadata(&e);
+    nft.create_metadata(&metadata, &1);
 
-//     let card_info = CardInfo::get_default_card(Category::Leader);
+    // Mint token 1 to user1
+    assert!(nft.exists(&user1,  &TokenId(1)) == false);
+    nft.mint(&user1,  &TokenId(1), &1, &Currency::Terry);
+    assert!(nft.exists(&user1,  &TokenId(1)) == true);
 
-//     // Fight
-//     nft.open_position(
-//         &user1,
-//         &Category::Leader,
-//         &TokenId(1),
-//         &fight::Currency::BTC,
-//         &SidePosition::Long,
-//         &120,
-//     );
-//     nft.close_position(&user1.clone(), &Category::Leader, &TokenId(1));
-// }
+    let card_info = CardInfo::get_default_card(Category::Leader);
+
+    // Fight
+    nft.open_position(
+        &user1,
+        &Category::Leader,
+        &TokenId(1),
+        &fight::FightCurrency::BTC,
+        &SidePosition::Long,
+        &120,
+    );
+    nft.close_position(&user1.clone(), &Category::Leader, &TokenId(1));
+}
 
 #[test]
 fn test_lending() {
@@ -613,7 +616,7 @@ fn test_lending() {
 
 //     let nft = create_nft(e, &admin1, &config);
 
-//     let price = nft.currency_price(&config.oracle_contract_id );//&fight::Currency::BTC);
+//     let price = nft.currency_price(&config.oracle_contract_id );//&fight::FightCurrency::BTC);
 //     assert!(price == 0);
 // }
 

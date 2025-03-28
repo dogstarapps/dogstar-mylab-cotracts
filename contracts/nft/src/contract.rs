@@ -406,7 +406,7 @@ impl NFT {
         owner: Address,
         category: Category,
         token_id: TokenId,
-        currency: fight::Currency,
+        currency: fight::FightCurrency,
         side_position: SidePosition,
         leverage: u32,
     ) {
@@ -426,7 +426,7 @@ impl NFT {
     }
 
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
-        fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
+        fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
     }
 
     pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
