@@ -415,7 +415,7 @@ fn test_lending() {
 
     // Create a Lend token 1
     nft.lend(&user1, &Category::Resource, &TokenId(1), &100);
-    nft.borrow(&user2, &Category::Resource, &TokenId(1), &100);
+    nft.borrow(&user2, &Category::Resource, &TokenId(1), &70);
     nft.repay(&user2, &Category::Resource, &TokenId(1));
     nft.withdraw(&user1, &Category::Resource, &TokenId(1));
 }

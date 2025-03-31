@@ -1,10 +1,12 @@
+extern crate std;
+
 use crate::{
     admin::{read_state, transfer_terry, write_state, State},
     *,
 };
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, Vec};
+use soroban_sdk::{contracttype, vec, Address, Env, Vec, log};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
 
@@ -243,7 +245,7 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
 
     write_state(&env, &state);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let lending = Lending {
         lender: owner.clone(),
@@ -306,7 +308,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     write_user(&env.clone(), owner.clone(), user);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let borrowing = Borrowing {
         borrower: owner.clone(),
@@ -386,7 +388,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     
     let config = read_config(&env);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     remove_borrowing(env, owner, category, token_id);
 }
@@ -405,7 +407,7 @@ fn liquidate(env: Env, state: &mut State) {
 }
 
 pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
+    // fee_payer.require_auth();
     let mut user = read_user(&env, fee_payer);
     let owner = user.owner.clone();
 
@@ -439,6 +441,9 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     if state.total_loan_count > 0 {
         avg_duration = state.total_loan_amount / state.total_loan_count;
     }
+    log!(&env, "Total offer {}", state);
+    std::println!("Total offer {}", state.total_offer);
+    assert!(state.total_offer != 0, "Total offer should be over 0");
     let apy = calculate_apy(
         state.total_demand,
         state.total_offer,
@@ -465,7 +470,23 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     let config = read_config(&env);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     remove_lending(env, owner, category, token_id);
+}
+
+fn get_current_apy() {
+    let state = read_state(&env);
+    let config = read_config(&env);
+
+    let mut avg_duration = 0u64;
+    if state.total_loan_count > 0 {
+        avg_duration = state.total_loan_amount / state.total_loan_count;
+    }
+    calculate_apy(
+        state.total_demand,
+        state.total_offer,
+        avg_duration,
+        config.apy_alpha as u64,
+    )
 }
