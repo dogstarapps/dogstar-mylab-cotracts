@@ -1,5 +1,3 @@
-extern crate std;
-
 use crate::{
     admin::{read_state, transfer_terry, write_state, State},
     *,
@@ -441,8 +439,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     if state.total_loan_count > 0 {
         avg_duration = state.total_loan_amount / state.total_loan_count;
     }
-    log!(&env, "Total offer {}", state);
-    std::println!("Total offer {}", state.total_offer);
+    log!(&env, "Total offer {}", state.total_offer);
     assert!(state.total_offer != 0, "Total offer should be over 0");
     let apy = calculate_apy(
         state.total_demand,
@@ -475,7 +472,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     remove_lending(env, owner, category, token_id);
 }
 
-fn get_current_apy() {
+pub fn get_current_apy(env: Env) -> u64 {
     let state = read_state(&env);
     let config = read_config(&env);
 

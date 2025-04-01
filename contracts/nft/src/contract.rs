@@ -482,15 +482,15 @@ impl NFT {
         lending::withdraw(env, lender, category, token_id)
     }
 
-    pub fn get_current_apy(env: Env) {
-        lending::get_current_apy()
+    pub fn get_current_apy(env: Env) -> u64 {
+        lending::get_current_apy(env)
     }
 
-    pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Lending {
         lending::read_lending(env, fee_payer, category, token_id)
     }
 
-    pub fn read_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    pub fn read_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Borrowing {
         lending::read_borrowing(env, fee_payer, category, token_id)
     }
 }
