@@ -498,21 +498,21 @@ impl NFT {
 // Deck
 #[contractimpl]
 impl NFT {
-    pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
-        deck::place(env, owner, categories, token_ids)
+    pub fn place(env: Env, owner: Address, token_id: TokenId) {
+        deck::place(env, owner, token_id)
     }
 
-    pub fn update_place(
-        env: Env,
-        owner: Address,
-        categories: Vec<Category>,
-        token_ids: Vec<TokenId>,
-    ) {
-        deck::update_place(env, owner, categories, token_ids)
-    }
+    // pub fn update_place(
+    //     env: Env,
+    //     owner: Address,
+    //     categories: Vec<Category>,
+    //     token_ids: Vec<TokenId>,
+    // ) {
+    //     deck::update_place(env, owner, categories, token_ids)
+    // }
 
-    pub fn remove_place(env: Env, owner: Address) {
-        deck::remove_deck(env, owner)
+    pub fn remove_place(env: Env, owner: Address, token_id: TokenId) {
+        deck::remove_place(env, owner, token_id)
     }
 
     pub fn read_deck(env: Env, owner: Address) -> Deck {
