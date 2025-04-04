@@ -3,3 +3,4 @@ target
 
 # Local Soroban settings
 .soroban
+.stellar
