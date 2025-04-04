@@ -4,3 +4,6 @@ target
 # Local Soroban settings
 .soroban
 .stellar
+
+# Rust's test output
+**/test_snapshots
