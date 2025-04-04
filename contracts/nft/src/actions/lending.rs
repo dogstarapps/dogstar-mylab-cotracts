@@ -8,6 +8,10 @@ use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
 
+const SCALE: u64 = 1_000_000; // 6-decimal fixed point
+const APY_MIN: u64 = 0; // 0% APY
+const APY_MAX: u64 = 300_000; // 30% APY = 0.30 * SCALE
+
 #[contracttype]
 #[derive(Clone, PartialEq)]
 pub struct Lending {
@@ -15,7 +19,7 @@ pub struct Lending {
     pub category: Category,
     pub token_id: TokenId,
     pub power: u32,
-    pub lent_at: u32,
+    pub lent_at: u64,
 }
 
 #[contracttype]
@@ -25,7 +29,7 @@ pub struct Borrowing {
     pub category: Category,
     pub token_id: TokenId,
     pub power: u32,
-    pub borrowed_at: u32,
+    pub borrowed_at: u64,
 }
 
 pub fn write_lending(
@@ -199,12 +203,29 @@ pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
         .unwrap_or(vec![&env.clone()])
 }
 
-fn calculate_apy(total_demand: u64, total_offer: u64, avg_duration: u64, alpha: u64) -> u64 {
-    let apy_min = 0u64;
-    let apy_max = 300_000u64;
-    let utilization = 1_000_000 * total_demand / total_offer;
-    let factor_time = 1_000_000_000_000 / (1_000_000 + alpha * avg_duration);
-    apy_min + (apy_max - apy_min) * utilization * factor_time / 1_000_000_000_000
+pub fn calculate_apy(
+    total_demand: u64,
+    total_offer: u64,
+    total_loan_duration: u64,
+    total_loan_count: u64,
+    alpha: u64,
+) -> u64 {
+    if total_demand == 0 || total_offer == 0 || total_loan_count == 0 {
+        return APY_MIN;
+    }
+    let demand_ratio = total_demand * SCALE / total_offer;
+    let average_duration = total_loan_duration * SCALE / total_loan_count;
+    let alpha_t = alpha * average_duration / SCALE;
+    let time_denom = SCALE + alpha_t;
+    let time_factor = SCALE * SCALE / time_denom;
+    let multiplier = demand_ratio * time_factor / SCALE;
+    let apy_range = APY_MAX - APY_MIN;
+    let apy = APY_MIN + (apy_range * multiplier / SCALE);
+    apy
+}
+
+fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
+    principal * apy * loan_duration / 8_760 / SCALE
 }
 
 pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
@@ -238,8 +259,6 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
     let mut state = read_state(&env);
 
     state.total_offer += power as u64;
-    state.total_loan_amount += power as u64;
-    state.total_loan_count += 1;
 
     write_state(&env, &state);
 
@@ -250,7 +269,7 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
         category: category.clone(),
         token_id: token_id.clone(),
         power,
-        lent_at: env.ledger().sequence(),
+        lent_at: env.ledger().timestamp(),
     };
 
     write_lending(
@@ -277,23 +296,24 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         nft.locked_by_action == Action::None,
         "Card is locked by another action"
     );
-    assert!(nft.power >= power, "Exceed power amount to borrow");
+
+    let config = read_config(&env);
+
+    let state = read_state(&env);
+
+    let apy = calculate_apy(
+        state.total_demand,
+        state.total_offer,
+        state.total_loan_duration,
+        state.total_loan_count,
+        config.apy_alpha as u64,
+    );
+    let reserve = power as u64 + calculate_interest(power as u64, apy, 4_380);
+    assert!(nft.power as u64 >= reserve, "Exceed power amount to borrow");
 
     nft.locked_by_action = Action::Borrow;
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
-
-    let config = read_config(&env);
-
-    let mut state = read_state(&env);
-    assert!(
-        state.total_offer - state.total_demand >= power as u64,
-        "Exceed power amount to borrow"
-    );
-
-    state.total_demand += power as u64;
-
-    write_state(&env, &state);
 
     let mut balance = read_balance(&env);
 
@@ -313,7 +333,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         category: category.clone(),
         token_id: token_id.clone(),
         power: power.clone(),
-        borrowed_at: env.ledger().sequence(),
+        borrowed_at: env.ledger().timestamp(),
     };
 
     write_borrowing(
@@ -352,21 +372,19 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     let mut state = read_state(&env);
 
-    state.total_demand -= borrowing.power as u64;
+    let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
+    state.total_demand += borrowing.power as u64 * loan_duration;
+    state.total_loan_duration += loan_duration;
+    state.total_loan_count += 1;
 
-    let current_block = env.ledger().sequence();
-    let time_elapse = current_block - borrowing.borrowed_at;
-    let mut avg_duration = 0u64;
-    if state.total_loan_count > 0 {
-        avg_duration = state.total_loan_amount / state.total_loan_count;
-    }
     let apy = calculate_apy(
         state.total_demand,
         state.total_offer,
-        avg_duration,
+        state.total_loan_duration,
+        state.total_loan_count,
         config.apy_alpha as u64,
     );
-    let interest_amount = (apy * borrowing.power as u64 * time_elapse as u64) / 1_000_000;
+    let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
     state.total_interest += interest_amount as u64;
 
     write_state(&env, &state);
@@ -383,7 +401,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     user.power -= borrowing.power + interest_amount as u32;
 
     write_user(&env, owner.clone(), user);
-    
+
     let config = read_config(&env);
 
     transfer_terry(&env, owner.clone(), config.terry_per_action);
@@ -431,21 +449,15 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     let mut state = read_state(&env);
 
-    state.total_offer -= lending.power as u64;
-
-    let current_block = env.ledger().sequence();
-    let time_elapse = current_block - lending.lent_at;
-    let mut avg_duration = 0u64;
-    if state.total_loan_count > 0 {
-        avg_duration = state.total_loan_amount / state.total_loan_count;
-    }
+    let loan_duration = (env.ledger().timestamp() - lending.lent_at) / 3_600;
     let apy = calculate_apy(
         state.total_demand,
         state.total_offer,
-        avg_duration,
+        state.total_loan_duration,
+        state.total_loan_count,
         config.apy_alpha as u64,
     );
-    let interest_amount = (apy * lending.power as u64 * time_elapse as u64) / 1_000_000;
+    let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration);
 
     if state.total_interest < interest_amount {
         liquidate(env.clone(), &mut state);

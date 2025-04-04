@@ -38,7 +38,7 @@ pub struct State {
     pub total_offer: u64,
     pub total_demand: u64,
     pub total_interest: u64,
-    pub total_loan_amount: u64,
+    pub total_loan_duration: u64,
     pub total_loan_count: u64,
 }
 
@@ -102,7 +102,7 @@ pub fn read_state(e: &Env) -> State {
         total_offer: 0,
         total_demand: 0,
         total_interest: 0,
-        total_loan_amount: 0,
+        total_loan_duration: 0,
         total_loan_count: 0,
     })
 }

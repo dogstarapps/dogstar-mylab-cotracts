@@ -378,10 +378,13 @@ fn test_lending() {
     let terry_token_client = TokenClient::new(&e, &terry_token);
 
     let nft = create_nft(e.clone(), &admin1, &config);
-
+    
     let metadata = create_metadata(&e);
     nft.create_metadata(&metadata, &1);
-
+    
+    // Mint terry tokens to nft contract
+    mint_token(&e, config.terry_token.clone(),nft.address.clone(), 1000);
+    assert_eq!(terry_token_client.balance(&nft.address), 1000);
     // Mint terry tokens to user1 & user2
     mint_token(&e, config.terry_token.clone(), user1.clone(), 1000);
     assert_eq!(terry_token_client.balance(&user1), 1000);
