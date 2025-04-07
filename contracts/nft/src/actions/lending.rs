@@ -205,7 +205,7 @@ pub fn borrow(
 
     borrower_nft.locked_by_action = Action::Borrow;
     borrower.power += lending.power;
-    borrower.power -= power_fee;;
+    borrower.power -= power_fee;
 
     //borrower_nft.power += lending.power;
     //borrower_nft.power -= power_fee;
