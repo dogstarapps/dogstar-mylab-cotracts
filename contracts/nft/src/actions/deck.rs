@@ -127,7 +127,7 @@ pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
 
     deck.token_ids.push_back(token_id.clone());
     let mut total_power = 0;
-    if (deck.token_ids.len() == 4) {
+    if deck.token_ids.len() == 4 {
         // check unique categories
         for id in deck.token_ids.iter() {
             let _nft = read_nft(&env, fee_payer.clone(), id.clone()).unwrap();
