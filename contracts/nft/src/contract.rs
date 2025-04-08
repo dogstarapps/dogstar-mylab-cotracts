@@ -122,6 +122,19 @@ impl NFT {
         mint_terry(&e, player, amount);
     }
 
+    pub fn batch_mint_terry(e: Env, to_addresses: Vec<Address>, amounts: Vec<i128>) {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+
+        if to_addresses.len() != amounts.len() {
+            panic!("Mismatched lengths of addresses and amounts");
+        }
+
+        for (to, amount) in to_addresses.iter().zip(amounts.iter()) {
+            mint_terry(&e, to, amount);
+        }
+    }
+
     pub fn terry_balance(e: Env, player: Address) -> i128 {
         let user = read_user(&e, player);
         user.terry
