@@ -11,6 +11,7 @@ pub struct User {
     pub owner: Address,
     pub power: u32,
     pub terry: i128,
+    pub total_history_terry: i128,
 }
 
 pub fn add_card_to_owner(env: &Env, token_id: TokenId, user: Address) -> Result<(), MyLabError> {
@@ -41,6 +42,7 @@ pub fn read_user(e: &Env, user: Address) -> User {
         owner: user,
         power: 0,
         terry: 0,
+        total_history_terry: 0,
     })
 }
 
@@ -51,7 +53,7 @@ pub fn write_user(e: &Env, fee_payer: Address, user_info: User) {
 
 pub fn get_user_level(e: &Env, fee_payer: Address) -> u32 {
     let user = read_user(&e, fee_payer.clone());
-    let balance = user.terry;
+    let balance = user.total_history_terry;
     log!(&e, "get_user_level >> User balance {}", balance);
 
     // Fetch the last level ID from storage
@@ -117,6 +119,7 @@ pub fn read_owner_card(env: &Env, owner: Address) -> Vec<TokenId> {
 pub fn mint_terry(e: &Env, owner: Address, amount: i128) {
     let mut user = read_user(e, owner.clone());
     user.terry += amount;
+    user.total_history_terry += amount;
     write_user(e, user.owner.clone(), user);
     log!(&e, "mint_terry >> Minted terry {}", amount);
 }
