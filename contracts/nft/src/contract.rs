@@ -3,13 +3,13 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, mint_token, read_administrator, read_balance, read_config, read_state, transfer_terry, update_level, write_administrator, write_balance, write_config, Balance, Config, State
+    add_level, has_administrator, mint_token, read_administrator, read_balance, read_config, read_state, update_level, write_administrator, write_balance, write_config, Balance, Config, State
 };
 use crate::nft_info::{
-    exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
+    exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency
 };
 use crate::metadata::{read_metadata, write_metadata, CardMetadata};
-use crate::nft_info::{exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency};
+
 use crate::storage_types::{
     DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
@@ -272,9 +272,9 @@ impl NFT {
         read_state(&env)
     }
 
-    pub fn transfer_terry(env: Env, to: Address, amount: i128) {
-        transfer_terry(&env, to, amount)
-    }
+    // pub fn transfer_terry(env: Env, to: Address, amount: i128) {
+    //     transfer_terry(&env, to, amount)
+    // }
 
     pub fn mint_token(env: Env, token: Address, to: Address, amount: i128) {
         mint_token(&env, token, to, amount)
@@ -457,6 +457,8 @@ impl NFT {
         category: Category,
         token_id: TokenId,
         power: u32,
+        interest_rate: u32,
+        duration: u32,
     ) {
         lending::lend(
             env,
@@ -464,32 +466,39 @@ impl NFT {
             category,
             token_id,
             power,
+            interest_rate,
+            duration
         )
     }
 
     pub fn borrow(
         env: Env,
-        borrower: Address,
+        fee_payer: Address,
+        lender: Address,
         category: Category,
         token_id: TokenId,
-        power: u32,
+        collateral_category: Category,
+        collateral_token_id: TokenId,
     ) {
         lending::borrow(
             env,
-            borrower,
+            fee_payer,
+            lender,
             category,
             token_id,
-            power,
+            collateral_category,
+            collateral_token_id,
         )
     }
 
     pub fn repay(
         env: Env,
-        borrower: Address,
+        fee_payer: Address,
+        lender: Address,
         category: Category,
-        token_id: TokenId,
+        token_id: TokenId
     ) {
-        lending::repay(env, borrower, category, token_id)
+        lending::repay(env, fee_payer, lender, category, token_id)
     }
 
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
