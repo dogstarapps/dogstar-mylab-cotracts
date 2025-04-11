@@ -1,11 +1,9 @@
 use crate::storage_types::{DataKey, Level};
-use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
-    pub terry_token: Address,
     pub xtar_token: Address,
     pub oracle_contract_id: Address,
     pub haw_ai_pot: Address,

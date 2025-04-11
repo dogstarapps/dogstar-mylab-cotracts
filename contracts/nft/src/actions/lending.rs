@@ -352,6 +352,10 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     let mut state = read_state(&env);
 
+    borrower_nft.locked_by_action = Action::Borrow;
+    borrower.power += lending.power;
+    borrower.power -= power_fee;
+    
     state.total_demand -= borrowing.power as u64;
 
     let current_block = env.ledger().sequence();

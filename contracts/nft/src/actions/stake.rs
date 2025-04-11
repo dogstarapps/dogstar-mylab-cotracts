@@ -1,5 +1,5 @@
-use crate::*;
-use admin::{transfer_terry, read_balance, read_config, write_balance};
+use crate::{user_info::mint_terry, *};
+use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -203,7 +203,7 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     let config = read_config(&env);
     let terry_amount = config.terry_per_power * interest_amount as i128;
 
-    // transfer_terry(&env, owner.clone(), terry_amount);
+    mint_terry(&env, owner.clone(), terry_amount);
 
     remove_stake(&env, owner.clone(), category.clone(), token_id.clone());
 }
