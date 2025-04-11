@@ -190,7 +190,7 @@ impl NFT {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount =
                 (config.burnable_percentage as i128) * card_metadata.price_xtar / 100;
-            let haw_ai_amount = card_metadata.price_terry - burnable_amount;
+            let haw_ai_amount = card_metadata.price_xtar - burnable_amount;
             // 50% of xtar price to burn and 50% to the haw ai pot
             token.burn(&to.clone(), &burnable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
