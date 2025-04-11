@@ -93,6 +93,7 @@
         }
       ]
     ],
+    [],
     []
   ],
   "ledger": {
@@ -1217,16 +1218,17 @@
           "v0": {
             "topics": [
               {
-                "symbol": "error"
+                "symbol": "fn_call"
               },
               {
-                "error": {
-                  "context": "internal_error"
-                }
+                "bytes": "f65bd4d892e052cedba1fd62974e564ffa9226ca720624f331c36770bea46c44"
+              },
+              {
+                "symbol": "balance"
               }
             ],
             "data": {
-              "string": "Current context has no contract ID"
+              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
             }
           }
         }
@@ -1236,22 +1238,23 @@
     {
       "event": {
         "ext": "v0",
-        "contract_id": null,
+        "contract_id": "f65bd4d892e052cedba1fd62974e564ffa9226ca720624f331c36770bea46c44",
         "type_": "diagnostic",
         "body": {
           "v0": {
             "topics": [
               {
-                "symbol": "error"
+                "symbol": "fn_return"
               },
               {
-                "error": {
-                  "context": "internal_error"
-                }
+                "symbol": "balance"
               }
             ],
             "data": {
-              "string": "escalating error to panic"
+              "i128": {
+                "hi": 0,
+                "lo": 100000
+              }
             }
           }
         }

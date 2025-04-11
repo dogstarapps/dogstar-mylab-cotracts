@@ -3,7 +3,7 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, transfer_terry, mint_token, read_administrator, read_balance, read_config, update_level, write_administrator, write_balance, write_config, Balance, Config
+    add_level, has_administrator, mint_token, read_administrator, read_balance, read_config, read_state, transfer_terry, update_level, write_administrator, write_balance, write_config, Balance, Config, State
 };
 use crate::nft_info::{
     exists, read_nft, remove_nft, write_nft, Action, Card, CardInfo, Category, Currency,
@@ -249,6 +249,9 @@ impl NFT {
         read_balance(&env)
     }
 
+    pub fn admin_state(env: &Env) -> State {
+        read_state(&env)
+    }
 
     pub fn transfer_terry(env: Env, to: Address, amount: i128) {
         transfer_terry(&env, to, amount)
@@ -403,7 +406,7 @@ impl NFT {
         owner: Address,
         category: Category,
         token_id: TokenId,
-        currency: fight::Currency,
+        currency: fight::FightCurrency,
         side_position: SidePosition,
         leverage: u32,
     ) {
@@ -423,7 +426,11 @@ impl NFT {
     }
 
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
-        fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
+        fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
+    }
+
+    pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
+        fight::read_fight(env, fee_payer, category, token_id)
     }
 }
 
@@ -432,56 +439,59 @@ impl NFT {
 impl NFT {
     pub fn lend(
         env: Env,
-        owner: Address,
+        lender: Address,
         category: Category,
         token_id: TokenId,
         power: u32,
-        interest_rate: u32,
-        duration: u32,
     ) {
         lending::lend(
             env,
-            owner,
+            lender,
             category,
             token_id,
             power,
-            interest_rate,
-            duration,
         )
     }
 
     pub fn borrow(
         env: Env,
         borrower: Address,
-        lender: Address,
         category: Category,
         token_id: TokenId,
-        collateral_category: Category,
-        collateral_token_id: TokenId,
+        power: u32,
     ) {
         lending::borrow(
             env,
             borrower,
-            lender,
             category,
             token_id,
-            collateral_category,
-            collateral_token_id,
+            power,
         )
     }
 
     pub fn repay(
         env: Env,
         borrower: Address,
-        lender: Address,
         category: Category,
         token_id: TokenId,
     ) {
-        lending::repay(env, borrower, lender, category, token_id)
+        lending::repay(env, borrower, category, token_id)
     }
 
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
         lending::withdraw(env, lender, category, token_id)
+    }
+
+    pub fn get_current_apy(env: Env) -> u64 {
+        lending::get_current_apy(env)
+    }
+
+    pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Lending {
+        lending::read_lending(env, fee_payer, category, token_id)
+    }
+
+    pub fn read_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Borrowing {
+        lending::read_borrowing(env, fee_payer, category, token_id)
     }
 }
 
