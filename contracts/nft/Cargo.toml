@@ -10,7 +10,9 @@ crate-type = ["cdylib"]
 [dependencies]
 soroban-sdk = { workspace = true }
 soroban-token-sdk = { version = "20.3.1" }
+log = "0.4"
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+env_logger = "0.11"
 

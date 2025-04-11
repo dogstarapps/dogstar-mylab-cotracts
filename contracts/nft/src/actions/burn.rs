@@ -3,10 +3,10 @@ use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, remove_nft};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
-use user_info::read_user;
+use user_info::{ read_user, read_owner_card, write_owner_card };
 
 pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
-    fee_payer.require_auth();
+    // fee_payer.require_auth();
     let owner = read_user(&env, fee_payer.clone()).owner;
 
     let config = read_config(&env);
@@ -28,6 +28,15 @@ pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
 
     write_balance(&env, &balance);
 
+    remove_owner_card(&env, owner.clone(), token_id.clone());
     remove_nft(&env, owner, token_id);
        
 }
+
+pub fn remove_owner_card(env: &Env, owner: Address, token_id: TokenId) {
+    let mut user_card_ids = read_owner_card(&env, owner.clone());
+    let index = user_card_ids.iter().position(|x| x == token_id).unwrap();
+    user_card_ids.remove(index as u32);
+    write_owner_card(&env, owner.clone(), user_card_ids);
+}
+

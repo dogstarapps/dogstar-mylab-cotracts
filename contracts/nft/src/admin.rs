@@ -11,10 +11,12 @@ pub struct Config {
     pub burnable_percentage: u32,
     pub how_ai_percentage: u32,
     pub terry_per_power: i128,
+    pub terry_per_action: i128,
     pub stake_periods: Vec<u32>,
     pub stake_interest_percentages: Vec<u32>,
     pub power_action_fee: u32,
     pub burn_receive_percentage: u32,
+    pub apy_alpha: u32,
 }
 
 #[contracttype]
@@ -26,6 +28,16 @@ pub struct Balance {
     pub haw_ai_power: u32,
     pub haw_ai_xtar: i128,
     pub total_deck_power: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct State {
+    pub total_offer: u64,
+    pub total_demand: u64,
+    pub total_interest: u64,
+    pub total_loan_amount: u64,
+    pub total_loan_count: u64,
 }
 
 pub fn has_administrator(e: &Env) -> bool {
@@ -75,6 +87,33 @@ pub fn read_balance(e: &Env) -> Balance {
         haw_ai_xtar: 0,
         total_deck_power: 0,
     })
+}
+
+pub fn write_state(e: &Env, state: &State) {
+    let key = DataKey::State;
+    e.storage().persistent().set(&key, state);
+}
+
+pub fn read_state(e: &Env) -> State {
+    let key = DataKey::State;
+    e.storage().persistent().get(&key).unwrap_or(State {
+        total_offer: 0,
+        total_demand: 0,
+        total_interest: 0,
+        total_loan_amount: 0,
+        total_loan_count: 0,
+    })
+}
+
+pub fn transfer_terry(e: &Env, to: Address, amount: i128) {
+    let config = read_config(&e);
+    let token_admin_client = TokenClient::new(&e, &config.terry_token);
+    token_admin_client.transfer(&e.current_contract_address(), &to, &amount);
+}
+
+pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
+    let token_admin_client = StellarAssetClient::new(&e, &token);
+    token_admin_client.mint(&to, &amount);
 }
 
 pub fn add_level(e: &Env, level: Level) -> u32 {
