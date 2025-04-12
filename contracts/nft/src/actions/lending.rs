@@ -1,5 +1,5 @@
 use crate::{
-    admin::{read_state, transfer_terry, write_state, State},
+    admin::{read_state, write_state, State},
     *,
 };
 use admin::{read_balance, read_config, write_balance};
@@ -262,7 +262,7 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
 
     write_state(&env, &state);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let lending = Lending {
         lender: owner.clone(),
@@ -326,7 +326,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     write_user(&env.clone(), owner.clone(), user);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let borrowing = Borrowing {
         borrower: owner.clone(),
@@ -404,7 +404,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     let config = read_config(&env);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     remove_borrowing(env, owner, category, token_id);
 }
@@ -477,7 +477,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     let config = read_config(&env);
 
-    transfer_terry(&env, owner.clone(), config.terry_per_action);
+    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     remove_lending(env, owner, category, token_id);
 }
