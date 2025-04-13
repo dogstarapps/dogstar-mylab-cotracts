@@ -481,3 +481,17 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     remove_lending(env, owner, category, token_id);
 }
+
+pub fn get_current_apy(env: Env) -> u64 {
+    let config = read_config(&env);
+
+    let state = read_state(&env);
+
+    calculate_apy(
+        state.total_demand,
+        state.total_offer,
+        state.total_loan_duration,
+        state.total_loan_count,
+        config.apy_alpha as u64,
+    )
+}
