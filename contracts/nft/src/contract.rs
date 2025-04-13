@@ -301,7 +301,7 @@ impl NFT {
         let user: User = User {
             owner,
             power: 100,
-            terry: 0,
+            terry: 100000,
             total_history_terry: 0,
         };
         write_user(&e, fee_payer, user);
