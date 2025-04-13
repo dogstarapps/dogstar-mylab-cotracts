@@ -3,13 +3,12 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, mint_token, read_administrator, read_balance, read_config, read_state, update_level, write_administrator, write_balance, write_config, Balance, Config, State
-};
-use crate::nft_info::{
-    exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency
+    add_level, has_administrator, read_administrator, read_balance, read_config,
+    read_state, update_level, write_administrator, write_balance, write_config,
+    Balance, Config, State,
 };
 use crate::metadata::{read_metadata, write_metadata, CardMetadata};
-
+use crate::nft_info::{exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency};
 use crate::storage_types::{
     DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
 };
@@ -272,14 +271,6 @@ impl NFT {
         read_state(&env)
     }
 
-    // pub fn transfer_terry(env: Env, to: Address, amount: i128) {
-    //     transfer_terry(&env, to, amount)
-    // }
-
-    pub fn mint_token(env: Env, token: Address, to: Address, amount: i128) {
-        mint_token(&env, token, to, amount)
-    }
-
     pub fn config(env: Env) -> Config {
         read_config(&env)
     }
@@ -301,7 +292,7 @@ impl NFT {
         let user: User = User {
             owner,
             power: 100,
-            terry: 100000,
+            terry: 0,
             total_history_terry: 0,
         };
         write_user(&e, fee_payer, user);
@@ -377,6 +368,7 @@ impl NFT {
         fee_payer: Address,
         category: Category,
         token_id: TokenId,
+        stake_power: u32,
         period_index: u32,
     ) {
         stake::stake(
@@ -384,6 +376,7 @@ impl NFT {
             fee_payer,
             category,
             token_id,
+            stake_power,
             period_index,
         )
     }
@@ -420,7 +413,7 @@ impl NFT {
         owner: Address,
         category: Category,
         token_id: TokenId,
-        currency: fight::FightCurrency,
+        currency: fight::Currency,
         side_position: SidePosition,
         leverage: u32,
     ) {
@@ -440,102 +433,48 @@ impl NFT {
     }
 
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
-        fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
-    }
-
-    pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
-        fight::read_fight(env, fee_payer, category, token_id)
+        fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
     }
 }
 
 // Lend & Borrow
 #[contractimpl]
 impl NFT {
-    pub fn lend(
-        env: Env,
-        lender: Address,
-        category: Category,
-        token_id: TokenId,
-        power: u32,
-        interest_rate: u32,
-        duration: u32,
-    ) {
-        lending::lend(
-            env,
-            lender,
-            category,
-            token_id,
-            power,
-            interest_rate,
-            duration
-        )
+    pub fn lend(env: Env, lender: Address, category: Category, token_id: TokenId, power: u32) {
+        lending::lend(env, lender, category, token_id, power)
     }
 
-    pub fn borrow(
-        env: Env,
-        fee_payer: Address,
-        lender: Address,
-        category: Category,
-        token_id: TokenId,
-        collateral_category: Category,
-        collateral_token_id: TokenId,
-    ) {
-        lending::borrow(
-            env,
-            fee_payer,
-            lender,
-            category,
-            token_id,
-            collateral_category,
-            collateral_token_id,
-        )
+    pub fn borrow(env: Env, borrower: Address, category: Category, token_id: TokenId, power: u32) {
+        lending::borrow(env, borrower, category, token_id, power)
     }
 
-    pub fn repay(
-        env: Env,
-        fee_payer: Address,
-        lender: Address,
-        category: Category,
-        token_id: TokenId
-    ) {
-        lending::repay(env, fee_payer, lender, category, token_id)
+    pub fn repay(env: Env, borrower: Address, category: Category, token_id: TokenId) {
+        lending::repay(env, borrower, category, token_id)
     }
 
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
         lending::withdraw(env, lender, category, token_id)
-    }
-
-    pub fn get_current_apy(env: Env) -> u64 {
-        lending::get_current_apy(env)
-    }
-
-    pub fn read_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Lending {
-        lending::read_lending(env, fee_payer, category, token_id)
-    }
-
-    pub fn read_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> lending::Borrowing {
-        lending::read_borrowing(env, fee_payer, category, token_id)
     }
 }
 
 // Deck
 #[contractimpl]
 impl NFT {
-    pub fn place(env: Env, owner: Address, token_id: TokenId) {
-        deck::place(env, owner, token_id)
+    pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
+        deck::place(env, owner, categories, token_ids)
     }
 
-    // pub fn update_place(
-    //     env: Env,
-    //     owner: Address,
-    //     categories: Vec<Category>,
-    //     token_ids: Vec<TokenId>,
-    // ) {
-    //     deck::update_place(env, owner, categories, token_ids)
-    // }
+    pub fn update_place(
+        env: Env,
+        owner: Address,
+        categories: Vec<Category>,
+        token_ids: Vec<TokenId>,
+    ) {
+        deck::update_place(env, owner, categories, token_ids)
+    }
 
-    pub fn remove_place(env: Env, owner: Address, token_id: TokenId) {
-        deck::remove_place(env, owner, token_id)
+    pub fn remove_place(env: Env, owner: Address) {
+        deck::remove_deck(env, owner)
     }
 
     pub fn read_deck(env: Env, owner: Address) -> Deck {

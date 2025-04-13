@@ -1,6 +1,5 @@
 use crate::storage_types::{DataKey, Level};
 use soroban_sdk::{contracttype, Address, Env, Vec};
-use soroban_sdk::token::StellarAssetClient;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,7 +36,7 @@ pub struct State {
     pub total_offer: u64,
     pub total_demand: u64,
     pub total_interest: u64,
-    pub total_loan_amount: u64,
+    pub total_loan_duration: u64,
     pub total_loan_count: u64,
 }
 
@@ -101,20 +100,9 @@ pub fn read_state(e: &Env) -> State {
         total_offer: 0,
         total_demand: 0,
         total_interest: 0,
-        total_loan_amount: 0,
+        total_loan_duration: 0,
         total_loan_count: 0,
     })
-}
-
-// pub fn transfer_terry(e: &Env, to: Address, amount: i128) {
-//     let config = read_config(&e);
-//     let token_admin_client = TokenClient::new(&e, &config.terry_token);
-//     token_admin_client.transfer(&e.current_contract_address(), &to, &amount);
-// }
-
-pub fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
-    let token_admin_client = StellarAssetClient::new(&e, &token);
-    token_admin_client.mint(&to, &amount);
 }
 
 pub fn add_level(e: &Env, level: Level) -> u32 {
