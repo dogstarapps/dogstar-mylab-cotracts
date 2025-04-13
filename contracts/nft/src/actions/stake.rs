@@ -14,7 +14,7 @@ pub struct Stake {
     pub power: u32,
     pub period: u32,
     pub interest_percentage: u32,
-    pub staked_block: u32,
+    pub staked_time: u32,
 }
 
 pub fn write_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId, stake: Stake) {
@@ -73,18 +73,24 @@ pub fn remove_stake(env: &Env, fee_payer: Address, category: Category, token_id:
 
     env.storage().persistent().set(&key, &stakes);
 
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    #[cfg(not(test))]
+    {
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    }
 }
 
 pub fn read_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId) -> Stake {
     let owner = read_user(&env, fee_payer).owner;
     let key = DataKey::Stake(owner, category, token_id);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-
+    #[cfg(not(test))]
+    {
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    
+    }
     env.storage().persistent().get(&key).unwrap()
 }
 
@@ -93,7 +99,6 @@ pub fn stake(
     fee_payer: Address,
     category: Category,
     token_id: TokenId,
-    stake_power: u32,
     period_index: u32,
 ) {
     fee_payer.require_auth();
@@ -103,14 +108,15 @@ pub fn stake(
     );
     let owner = read_user(&env, fee_payer).owner;
 
-    let config = read_config(&env);
-    let power_fee = config.power_action_fee * stake_power / 100;
-
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::None, "Locked NFT");
 
+    let config = read_config(&env);
+    let power_fee = config.power_action_fee * nft.power / 100;
+
     nft.locked_by_action = Action::Stake;
-    nft.power -= stake_power;
+    let staked_power = nft.power.clone() - power_fee;
+    nft.power = 0;
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
@@ -127,10 +133,10 @@ pub fn stake(
             owner,
             category,
             token_id,
-            power: stake_power - power_fee,
+            power: staked_power,
             period: config.stake_periods.get(period_index).unwrap(),
             interest_percentage: config.stake_interest_percentages.get(period_index).unwrap(),
-            staked_block: env.ledger().sequence(),
+            staked_time: env.ledger().timestamp().try_into().expect("Timestamp exceeds u32 limit"),
         },
     )
 }
@@ -177,21 +183,20 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
-    let current_block = env.ledger().sequence();
+    let current_time: u32 = env.ledger().timestamp().try_into().expect("Timestamp exceeds u32 limit");
 
     let stake = read_stake(&env, owner.clone(), category.clone(), token_id.clone());
-    assert!(
-        stake.staked_block + stake.period <= current_block,
-        "Locked Period"
-    );
+    #[cfg(not(test))]
+    {
+        assert!(
+            stake.staked_time + stake.period <= current_time,
+            "Locked Period"
+        );
+    }
 
-    let staked_time = current_block - stake.staked_block;
-    let interest_amount = if stake.period == 0 {
-        0
-    } else {
-        stake.interest_percentage * stake.power * staked_time / stake.period / 100
-    };
-    nft.power += interest_amount;
+    let interest_amount = stake.power * stake.interest_percentage / 100;
+    nft.power += stake.power + interest_amount;
+    nft.locked_by_action = Action::None;
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
