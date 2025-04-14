@@ -1,5 +1,5 @@
 use crate::{
-    admin::{read_state, write_state, State},
+    admin::{read_state, write_state},
     *,
 };
 use admin::{read_balance, read_config, write_balance};
@@ -299,7 +299,15 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     let config = read_config(&env);
 
-    let state = read_state(&env);
+    let mut state = read_state(&env);
+    assert!(
+        state.total_offer >= power as u64,
+        "Insufficient power to borrow"
+    );
+
+    state.total_offer -= power as u64;
+
+    write_state(&env, &state);
 
     let apy = calculate_apy(
         state.total_demand,
@@ -386,6 +394,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     );
     let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
     state.total_interest += interest_amount as u64;
+    state.total_offer += borrowing.power as u64;
 
     write_state(&env, &state);
 
@@ -409,16 +418,33 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     remove_borrowing(env, owner, category, token_id);
 }
 
-fn liquidate(env: Env, state: &mut State) {
+fn liquidate(env: Env) {
     for borrowing in read_borrowings(env.clone()) {
         let nft = read_nft(&env, borrowing.borrower.clone(), borrowing.token_id.clone()).unwrap();
-        state.total_interest += nft.power as u64;
-        remove_borrowing(
-            env.clone(),
-            borrowing.borrower,
-            borrowing.category,
-            borrowing.token_id,
+
+        let config = read_config(&env);
+        let mut state = read_state(&env);
+        let apy = calculate_apy(
+            state.total_demand,
+            state.total_offer,
+            state.total_loan_duration,
+            state.total_loan_count,
+            config.apy_alpha as u64,
         );
+        let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
+        let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
+
+        if nft.power < borrowing.power + interest_amount as u32 {
+            state.total_interest += nft.power as u64;
+
+            write_state(&env, &state);
+            remove_borrowing(
+                env.clone(),
+                borrowing.borrower,
+                borrowing.category,
+                borrowing.token_id,
+            );
+        }
     }
 }
 
@@ -460,10 +486,13 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration);
 
     if state.total_interest < interest_amount {
-        liquidate(env.clone(), &mut state);
+        liquidate(env.clone());
     }
 
+    state = read_state(&env);
+
     state.total_interest -= interest_amount;
+    state.total_offer -= lending.power as u64;
 
     write_state(&env, &state);
 
