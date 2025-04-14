@@ -28,7 +28,7 @@ fn generate_config(e: &Env) -> Config {
         haw_ai_pot: Address::generate(e),
         withdrawable_percentage: 50,
         burnable_percentage: 50,
-        how_ai_percentage: 50,
+        haw_ai_percentage: 50,
         terry_per_power: 100,
         terry_per_action: 10,
         stake_periods: vec![&e.clone(), 0, 200, 300],
