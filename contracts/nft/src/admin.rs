@@ -9,7 +9,7 @@ pub struct Config {
     pub haw_ai_pot: Address,
     pub withdrawable_percentage: u32,
     pub burnable_percentage: u32,
-    pub how_ai_percentage: u32,
+    pub haw_ai_percentage: u32,
     pub terry_per_power: i128,
     pub terry_per_action: i128,
     pub stake_periods: Vec<u32>,
