@@ -299,7 +299,15 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     let config = read_config(&env);
 
-    let state = read_state(&env);
+    let mut state = read_state(&env);
+    assert!(
+        state.total_offer >= power as u64,
+        "Insufficient power to borrow"
+    );
+
+    state.total_offer -= power as u64;
+
+    write_state(&env, &state);
 
     let apy = calculate_apy(
         state.total_demand,
@@ -386,6 +394,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     );
     let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
     state.total_interest += interest_amount as u64;
+    state.total_offer += borrowing.power as u64;
 
     write_state(&env, &state);
 
