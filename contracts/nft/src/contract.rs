@@ -16,6 +16,7 @@ use crate::user_info::{
     add_card_to_owner, burn_terry, get_user_level, mint_terry, read_owner_card, read_user,
     write_user, User,
 };
+
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
 use soroban_sdk::{vec, String, Vec};
 use soroban_token_sdk::TokenUtils;
@@ -287,15 +288,18 @@ impl NFT {
         read_metadata(e, id)
     }
 
-    pub fn create_user(e: Env, fee_payer: Address, owner: Address) {
+    pub fn create_user(e: Env, address: Address) {
         //it should be admin
+        let admin = read_administrator(&e);
+        admin.require_auth();
+        //
         let user: User = User {
-            owner,
+            owner: address.clone(),
             power: 100,
             terry: 0,
             total_history_terry: 0,
         };
-        write_user(&e, fee_payer, user);
+        write_user(&e, address, user);
     }
 
     pub fn get_all_cards(e: &Env) -> soroban_sdk::Vec<CardMetadata> {
@@ -368,7 +372,6 @@ impl NFT {
         fee_payer: Address,
         category: Category,
         token_id: TokenId,
-        stake_power: u32,
         period_index: u32,
     ) {
         stake::stake(
@@ -376,7 +379,6 @@ impl NFT {
             fee_payer,
             category,
             token_id,
-            stake_power,
             period_index,
         )
     }
@@ -413,7 +415,7 @@ impl NFT {
         owner: Address,
         category: Category,
         token_id: TokenId,
-        currency: fight::Currency,
+        currency: fight::FightCurrency,
         side_position: SidePosition,
         leverage: u32,
     ) {
@@ -433,7 +435,10 @@ impl NFT {
     }
 
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
-        fight::get_currency_price(env, oracle_contract_id, fight::Currency::BTC)
+        fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
+    }
+    pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
+        fight::read_fight(env, fee_payer, category, token_id)
     }
 }
 
@@ -455,26 +460,35 @@ impl NFT {
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
         lending::withdraw(env, lender, category, token_id)
     }
+    pub fn get_current_apy(env: Env) -> u64 {
+        lending::get_current_apy(env)
+    }
+    pub fn read_lending(env: Env, player: Address, category: Category, token_id: TokenId) -> lending::Lending {
+        lending::read_lending(env, player, category, token_id)
+    }
+    pub fn read_borrowing(env: Env, player: Address, category: Category, token_id: TokenId) -> lending::Borrowing {
+        lending::read_borrowing(env, player, category, token_id)
+    }    
 }
 
 // Deck
 #[contractimpl]
 impl NFT {
-    pub fn place(env: Env, owner: Address, categories: Vec<Category>, token_ids: Vec<TokenId>) {
-        deck::place(env, owner, categories, token_ids)
+    pub fn place(env: Env, owner: Address, token_id: TokenId) {
+        deck::place(env, owner, token_id);
     }
 
-    pub fn update_place(
-        env: Env,
-        owner: Address,
-        categories: Vec<Category>,
-        token_ids: Vec<TokenId>,
-    ) {
-        deck::update_place(env, owner, categories, token_ids)
-    }
+    // pub fn update_place(
+    //     env: Env,
+    //     owner: Address,
+    //     categories: Vec<Category>,
+    //     token_ids: Vec<TokenId>,
+    // ) {
+    //     deck::update_place(env, owner, categories, token_ids)
+    // }
 
-    pub fn remove_place(env: Env, owner: Address) {
-        deck::remove_deck(env, owner)
+    pub fn remove_place(env: Env, owner: Address, token_id: TokenId) {
+        deck::remove_place(env, owner, token_id)
     }
 
     pub fn read_deck(env: Env, owner: Address) -> Deck {
