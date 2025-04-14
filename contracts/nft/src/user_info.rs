@@ -99,12 +99,20 @@ pub fn read_owner_card(env: &Env, owner: Address) -> Vec<TokenId> {
         "read_owner_card >> Read owner card for {}",
         owner.clone()
     );
-    let key = DataKey::OwnerOwnedCardIds(owner);
+    let key = DataKey::OwnerOwnedCardIds(owner.clone());
+    
+    if !env.storage().persistent().has(&key) {
+        log!(&env, "Not found cards for owner {}", owner.clone());
+        let empty_vec: Vec<TokenId> = Vec::new(&env);
+        env.storage().persistent().set(&key, &empty_vec);
+    }
+
     let card_list: Vec<TokenId> = env
         .storage()
         .persistent()
         .get(&key)
         .unwrap_or_else(|| Vec::new(&env));
+
     #[cfg(not(test))]
     {
         env.storage().persistent().extend_ttl(

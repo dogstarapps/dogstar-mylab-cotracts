@@ -7,10 +7,9 @@ use crate::{
     admin::Config,
     contract::NFT,
     metadata::CardMetadata,
-    nft_info::{ Category, Currency, Action, CardInfo },
+    nft_info::{ Category, Currency, Action },
     storage_types::TokenId,
-    user_info::{ read_user },
-    actions:: { fight },
+    actions::fight,
 };
 use soroban_sdk::token::StellarAssetClient;
 use soroban_sdk::{log, testutils::Address as _, vec, Address, Env};
