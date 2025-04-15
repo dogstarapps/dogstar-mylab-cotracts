@@ -179,7 +179,6 @@ pub fn increase_stake_power(
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
-    write_balance(&env, &balance);
 
     write_stake(
         &env,
@@ -191,6 +190,9 @@ pub fn increase_stake_power(
 
     // Mint terry to user as rewards
     mint_terry(&env, owner, config.terry_per_stake);
+
+    balance.haw_ai_terry += config.terry_per_stake * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -229,4 +231,8 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
 
     // Mint terry to user as rewards
     mint_terry(&env, owner, config.terry_per_stake);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_stake * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }

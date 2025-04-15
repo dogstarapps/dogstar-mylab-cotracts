@@ -170,6 +170,10 @@ pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
     // Mint terry to user as rewards
     let config = read_config(&env);
     mint_terry(&env, fee_payer.clone(), config.terry_per_deck);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_deck * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 // pub fn update_place(env: Env) {}
@@ -213,6 +217,10 @@ pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
     // Mint terry to user as rewards
     let config = read_config(&env);
     mint_terry(&env, fee_payer.clone(), config.terry_per_deck);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_deck * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 // pub fn remove_all_place(env: Env, fee_payer: Address) {

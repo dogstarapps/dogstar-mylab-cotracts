@@ -170,7 +170,6 @@ pub fn open_position(
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
-    write_balance(&env, &balance);
 
     write_nft(&env, owner.clone(), token_id.clone(), nft.clone());
 
@@ -202,6 +201,9 @@ pub fn open_position(
     // Mint terry to user as rewards
     let config = read_config(&env);
     mint_terry(&env, owner, config.terry_per_fight);
+
+    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -257,4 +259,8 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
 
     // Mint terry to user as rewards
     mint_terry(&env, owner, config.terry_per_fight);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }

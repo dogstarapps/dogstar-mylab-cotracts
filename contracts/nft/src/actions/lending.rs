@@ -255,8 +255,6 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
     let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
-    write_balance(&env, &balance);
-
     let mut state = read_state(&env);
 
     state.total_offer += power as u64;
@@ -281,6 +279,9 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
 
     // Mint terry to user as rewards
     mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
@@ -330,8 +331,6 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
-    write_balance(&env, &balance);
-
     user.power += power;
 
     write_user(&env.clone(), owner.clone(), user);
@@ -354,6 +353,9 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     // Mint terry to user as rewards
     mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -419,6 +421,10 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     // Mint terry to user as rewards
     let config = read_config(&env);
     mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 fn liquidate(env: Env) {
@@ -512,6 +518,10 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     // Mint terry to user as rewards
     let config = read_config(&env);
     mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn get_current_apy(env: Env) -> u64 {
