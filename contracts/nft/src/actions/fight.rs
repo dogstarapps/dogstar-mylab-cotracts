@@ -240,6 +240,7 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
 
     if power < 0 {
         if nft.power < -power as u32 {
+            // lose the ownership of the card ???
             nft.power = 0;
         } else {
             nft.power -= power as u32;
