@@ -12,6 +12,7 @@ pub struct User {
     pub power: u32,
     pub terry: i128,
     pub total_history_terry: i128,
+    pub level: u32,
 }
 
 pub fn add_card_to_owner(env: &Env, token_id: TokenId, user: Address) -> Result<(), MyLabError> {
@@ -43,6 +44,7 @@ pub fn read_user(e: &Env, user: Address) -> User {
         power: 0,
         terry: 0,
         total_history_terry: 0,
+        level: 1,
     })
 }
 
@@ -128,6 +130,7 @@ pub fn mint_terry(e: &Env, owner: Address, amount: i128) {
     let mut user = read_user(e, owner.clone());
     user.terry += amount;
     user.total_history_terry += amount;
+    user.level = get_user_level(e, owner.clone());
     write_user(e, user.owner.clone(), user);
     log!(&e, "mint_terry >> Minted terry {}", amount);
 }

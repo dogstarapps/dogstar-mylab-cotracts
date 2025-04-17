@@ -298,6 +298,7 @@ impl NFT {
             power: 100,
             terry: 0,
             total_history_terry: 0,
+            level: 1,
         };
         write_user(&e, address, user);
     }
