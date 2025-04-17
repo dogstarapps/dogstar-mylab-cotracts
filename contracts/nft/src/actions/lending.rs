@@ -1,5 +1,6 @@
 use crate::{
     admin::{read_state, write_state},
+    user_info::mint_terry,
     *,
 };
 use admin::{read_balance, read_config, write_balance};
@@ -254,15 +255,11 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
     let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
-    write_balance(&env, &balance);
-
     let mut state = read_state(&env);
 
     state.total_offer += power as u64;
 
     write_state(&env, &state);
-
-    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let lending = Lending {
         lender: owner.clone(),
@@ -279,6 +276,12 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
         token_id.clone(),
         lending,
     );
+
+    // Mint terry to user as rewards
+    mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
@@ -328,13 +331,9 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
-    write_balance(&env, &balance);
-
     user.power += power;
 
     write_user(&env.clone(), owner.clone(), user);
-
-    // transfer_terry(&env, owner.clone(), config.terry_per_action);
 
     let borrowing = Borrowing {
         borrower: owner.clone(),
@@ -351,6 +350,12 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         token_id.clone(),
         borrowing,
     );
+
+    // Mint terry to user as rewards
+    mint_terry(&env, owner.clone(), config.terry_per_lending);
+
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -411,11 +416,15 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     write_user(&env, owner.clone(), user);
 
+    remove_borrowing(env.clone(), owner.clone(), category, token_id);
+
+    // Mint terry to user as rewards
     let config = read_config(&env);
+    mint_terry(&env, owner.clone(), config.terry_per_lending);
 
-    // transfer_terry(&env, owner.clone(), config.terry_per_action);
-
-    remove_borrowing(env, owner, category, token_id);
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 fn liquidate(env: Env) {
@@ -504,11 +513,15 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     write_user(&env, owner.clone(), user);
 
+    remove_lending(env.clone(), owner.clone(), category, token_id);
+
+    // Mint terry to user as rewards
     let config = read_config(&env);
+    mint_terry(&env, owner.clone(), config.terry_per_lending);
 
-    // transfer_terry(&env, owner.clone(), config.terry_per_action);
-
-    remove_lending(env, owner, category, token_id);
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn get_current_apy(env: Env) -> u64 {

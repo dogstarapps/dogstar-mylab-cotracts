@@ -3,9 +3,9 @@ use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, remove_nft};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
-use user_info::{ read_user, read_owner_card, write_owner_card };
+use user_info::{read_owner_card, read_user, write_owner_card};
 
-pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
+pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
     // fee_payer.require_auth();
     let owner = read_user(&env, fee_payer.clone()).owner;
 
@@ -16,7 +16,7 @@ pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
     let terry_amount = config.terry_per_power * nft.power as i128;
     let receive_amount = terry_amount * config.burn_receive_percentage as i128 / 100;
     let haw_ai_amount = terry_amount - receive_amount;
-    
+
     // mint 50% of terry amount to the owner
     mint_terry(&env, fee_payer.clone(), receive_amount);
 
@@ -30,7 +30,6 @@ pub fn burn(env: Env, fee_payer: Address,  token_id: TokenId) {
 
     remove_owner_card(&env, owner.clone(), token_id.clone());
     remove_nft(&env, owner, token_id);
-       
 }
 
 pub fn remove_owner_card(env: &Env, owner: Address, token_id: TokenId) {
@@ -39,4 +38,3 @@ pub fn remove_owner_card(env: &Env, owner: Address, token_id: TokenId) {
     user_card_ids.remove(index as u32);
     write_owner_card(&env, owner.clone(), user_card_ids);
 }
-

@@ -17,7 +17,13 @@ pub struct Stake {
     pub staked_time: u32,
 }
 
-pub fn write_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId, stake: Stake) {
+pub fn write_stake(
+    env: &Env,
+    fee_payer: Address,
+    category: Category,
+    token_id: TokenId,
+    stake: Stake,
+) {
     let owner = read_user(&env, fee_payer).owner;
     let key = DataKey::Stake(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &stake);
@@ -75,9 +81,11 @@ pub fn remove_stake(env: &Env, fee_payer: Address, category: Category, token_id:
 
     #[cfg(not(test))]
     {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        env.storage().persistent().extend_ttl(
+            &key,
+            BALANCE_LIFETIME_THRESHOLD,
+            BALANCE_BUMP_AMOUNT,
+        );
     }
 }
 
@@ -86,10 +94,11 @@ pub fn read_stake(env: &Env, fee_payer: Address, category: Category, token_id: T
     let key = DataKey::Stake(owner, category, token_id);
     #[cfg(not(test))]
     {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-    
+        env.storage().persistent().extend_ttl(
+            &key,
+            BALANCE_LIFETIME_THRESHOLD,
+            BALANCE_BUMP_AMOUNT,
+        );
     }
     env.storage().persistent().get(&key).unwrap()
 }
@@ -136,7 +145,11 @@ pub fn stake(
             power: staked_power,
             period: config.stake_periods.get(period_index).unwrap(),
             interest_percentage: config.stake_interest_percentages.get(period_index).unwrap(),
-            staked_time: env.ledger().timestamp().try_into().expect("Timestamp exceeds u32 limit"),
+            staked_time: env
+                .ledger()
+                .timestamp()
+                .try_into()
+                .expect("Timestamp exceeds u32 limit"),
         },
     )
 }
@@ -166,7 +179,6 @@ pub fn increase_stake_power(
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
-    write_balance(&env, &balance);
 
     write_stake(
         &env,
@@ -175,6 +187,12 @@ pub fn increase_stake_power(
         token_id.clone(),
         stake,
     );
+
+    // Mint terry to user as rewards
+    mint_terry(&env, owner, config.terry_per_stake);
+
+    balance.haw_ai_terry += config.terry_per_stake * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -183,7 +201,11 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 
-    let current_time: u32 = env.ledger().timestamp().try_into().expect("Timestamp exceeds u32 limit");
+    let current_time: u32 = env
+        .ledger()
+        .timestamp()
+        .try_into()
+        .expect("Timestamp exceeds u32 limit");
 
     let stake = read_stake(&env, owner.clone(), category.clone(), token_id.clone());
     #[cfg(not(test))]
@@ -206,4 +228,11 @@ pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: Token
     mint_terry(&env, owner.clone(), terry_amount);
 
     remove_stake(&env, owner.clone(), category.clone(), token_id.clone());
+
+    // Mint terry to user as rewards
+    mint_terry(&env, owner, config.terry_per_stake);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_stake * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }

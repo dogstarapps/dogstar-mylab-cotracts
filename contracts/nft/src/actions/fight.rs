@@ -1,9 +1,9 @@
-use crate::*;
+use crate::{user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use user_info::read_user;
 use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Val, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
+use user_info::read_user;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,8 +15,8 @@ pub enum Asset {
 //price record definition
 #[contracttype]
 pub struct PriceData {
-    price: i128,     //asset price at given point in time
-    timestamp: u64   //recording timestamp
+    price: i128,    //asset price at given point in time
+    timestamp: u64, //recording timestamp
 }
 
 #[contracttype]
@@ -48,7 +48,13 @@ pub struct Fight {
     pub leverage: u32,
 }
 
-pub fn write_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId, fight: Fight) {
+pub fn write_fight(
+    env: Env,
+    fee_payer: Address,
+    category: Category,
+    token_id: TokenId,
+    fight: Fight,
+) {
     // fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
@@ -86,7 +92,6 @@ pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: To
 }
 
 pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-
     let owner = read_user(&env, fee_payer).owner;
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -133,10 +138,10 @@ pub fn get_currency_price(env: Env, oracle_contract_id: Address, currency: Fight
     let args: Vec<Val> = (asset.clone(),).into_val(&env);
     let function_symbol = Symbol::new(&env, "lastprice");
 
-    let asset_price: Option<PriceData> = 
+    let asset_price: Option<PriceData> =
         env.invoke_contract(&oracle_contract_id, &function_symbol, args);
 
-    if let Some( asset_price) = asset_price {
+    if let Some(asset_price) = asset_price {
         asset_price.price
     } else {
         0
@@ -155,8 +160,7 @@ pub fn open_position(
     fee_payer.require_auth();
     let owner = read_user(&env, fee_payer).owner;
 
-
-    let mut nft = read_nft(&env, owner.clone(),  token_id.clone()).unwrap();
+    let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     nft.locked_by_action = Action::Fight;
 
     let config = read_config(&env);
@@ -166,21 +170,15 @@ pub fn open_position(
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
-    write_balance(&env, &balance);
 
-    write_nft(
-        &env,
-        owner.clone(),
-        token_id.clone(),
-        nft.clone(),
-    );
+    write_nft(&env, owner.clone(), token_id.clone(), nft.clone());
 
     // get currency price from oracle
-    let config = read_config(&env.clone());
     let mut trigger_price = 0;
     #[cfg(not(test))]
     {
-        trigger_price = get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
+        trigger_price =
+            get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
     }
 
     write_fight(
@@ -189,7 +187,7 @@ pub fn open_position(
         category.clone(),
         token_id.clone(),
         Fight {
-            owner,
+            owner: owner.clone(),
             category,
             token_id,
             currency,
@@ -199,6 +197,13 @@ pub fn open_position(
             leverage,
         },
     );
+
+    // Mint terry to user as rewards
+    let config = read_config(&env);
+    mint_terry(&env, owner, config.terry_per_fight);
+
+    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }
 
 pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
@@ -243,7 +248,7 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
         nft.power += power as u32;
     }
 
-    write_nft(&env, owner.clone(),  token_id.clone(), nft);
+    write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     remove_fight(
         env.clone(),
@@ -251,4 +256,11 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
         category.clone(),
         token_id.clone(),
     );
+
+    // Mint terry to user as rewards
+    mint_terry(&env, owner, config.terry_per_fight);
+
+    let mut balance = read_balance(&env);
+    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    write_balance(&env, &balance);
 }

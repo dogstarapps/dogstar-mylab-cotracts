@@ -11,11 +11,14 @@ pub struct Config {
     pub burnable_percentage: u32,
     pub haw_ai_percentage: u32,
     pub terry_per_power: i128,
-    pub terry_per_action: i128,
     pub stake_periods: Vec<u32>,
     pub stake_interest_percentages: Vec<u32>,
     pub power_action_fee: u32,
     pub burn_receive_percentage: u32,
+    pub terry_per_deck: i128,
+    pub terry_per_fight: i128,
+    pub terry_per_lending: i128,
+    pub terry_per_stake: i128,
     pub apy_alpha: u32,
 }
 
