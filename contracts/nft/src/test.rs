@@ -340,10 +340,15 @@ fn test_deck() {
     metadata_4.token_id = 4;
     metadata_4.category = Category::Weapon;
 
+    let mut metadata_5 = create_metadata(&e);
+    metadata_5.token_id = 5;
+    metadata_5.category = Category::Weapon;
+
     nft.create_metadata(&metadata_1, &1);
     nft.create_metadata(&metadata_2, &2);
     nft.create_metadata(&metadata_3, &3);
     nft.create_metadata(&metadata_4, &4);
+    nft.create_metadata(&metadata_5, &5);
 
     nft.create_user(&user1);
     // Mint 100000 terry to player
@@ -361,6 +366,7 @@ fn test_deck() {
     nft.mint(&user1, &TokenId(2), &1, &Currency::Terry);
     nft.mint(&user1, &TokenId(3), &1, &Currency::Terry);
     nft.mint(&user1, &TokenId(4), &1, &Currency::Terry);
+    nft.mint(&user1, &TokenId(5), &1, &Currency::Terry);
 
     assert!(nft.exists(&user2, &TokenId(1)) == false);
     nft.mint(&user2, &TokenId(1), &1, &Currency::Terry);
@@ -385,11 +391,18 @@ fn test_deck() {
     let mut balance = nft.admin_balance();
     assert_eq!(balance.total_deck_power, 4000);
 
+    nft.replace(&user1, &TokenId(3), &TokenId(5));
+
+    deck1 = nft.read_deck(&user1);
+    assert_eq!(deck1.bonus, 10);
+    assert_eq!(deck1.total_power, 4000);
+    assert_eq!(deck1.token_ids.len(), 4);
+
     nft.remove_place(&user1, &TokenId(1));
     nft.remove_place(&user1, &TokenId(2));
 
     deck1 = nft.read_deck(&user1);
     assert_eq!(deck1.bonus, 0);
     assert_eq!(deck1.total_power, 0);
-    assert_eq!(deck1.token_ids.len(), 3);
+    assert_eq!(deck1.token_ids.len(), 2);
 }

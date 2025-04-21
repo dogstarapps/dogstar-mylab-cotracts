@@ -124,47 +124,11 @@ pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
     nft.locked_by_action = Action::Deck;
 
     write_nft(&env, fee_payer.clone(), token_id.clone(), nft.clone());
-    let mut unique_categories = vec![&env.clone()];
-
     deck.token_ids.push_back(token_id.clone());
-    let mut total_power = 0;
+    
     if deck.token_ids.len() == 4 {
-        // check unique categories
-        for id in deck.token_ids.iter() {
-            let _nft = read_nft(&env, fee_payer.clone(), id.clone()).unwrap();
-            let metadata = read_metadata(&env, id.clone().0);
-            let category = metadata.category;
-
-            total_power += _nft.power;
-
-            if !unique_categories.contains(&category) {
-                unique_categories.push_back(category.clone());
-            }
-        }
-        // calculate bonus
-        let bonus = match unique_categories.len() {
-            1 => 0,
-            2 => 5,
-            3 => 10,
-            4 => 25,
-            _ => 0,
-        };
-
-        // update power balance
-        let mut balance = read_balance(&env);
-        balance.total_deck_power += total_power;
-
-        write_balance(&env, &balance);
-
-        // write deck
-
-        deck.bonus = bonus;
-        deck.total_power = total_power;
-
-        // update haw ai percentages
-        update_haw_ai_percentages(env.clone());
+        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
     }
-
     write_deck(env.clone(), fee_payer.clone(), deck);
 
     // Mint terry to user as rewards
@@ -176,6 +140,53 @@ pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
     write_balance(&env, &balance);
 }
 
+pub fn replace(env: Env, fee_payer: Address, prev_token_id: TokenId, token_id: TokenId) {
+    // Read deck
+    let mut deck = read_deck(env.clone(), fee_payer.clone());
+
+    let mut prev_nft = read_nft(&env, fee_payer.clone(), prev_token_id.clone()).unwrap();
+
+    assert!(
+        prev_nft.locked_by_action == Action::Deck,
+        "Not locked by Deck"
+    );
+
+    let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+    assert!(
+        nft.locked_by_action == Action::None,
+        "Locked by other action"
+    );
+    // Set the actions of newly added nft to Deck
+    if let Some(index) = deck.token_ids.iter().position(|x| x == prev_token_id.clone()) {
+        deck.token_ids.remove(index.try_into().unwrap());
+        deck.token_ids.insert(index.try_into().unwrap(), token_id.clone());
+    }
+    // Set the action of removed nft to None
+    prev_nft.locked_by_action = Action::None;
+
+    write_nft(&env, fee_payer.clone(), prev_token_id.clone(), prev_nft);
+    // Update deck
+    if (deck.token_ids.len() == 4) {
+        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
+    }
+    write_deck(env.clone(), fee_payer.clone(), deck);
+
+}
+
+pub fn update_deck(env: Env, fee_payer: Address, token_ids: Vec<TokenId>) {
+    let mut deck = read_deck(env.clone(), fee_payer.clone());
+    
+    assert!(token_ids.len() < 4, "Decks are exceed!");
+    assert!(token_ids.len() < 4, "Decks are exceed!");
+
+    deck.token_ids = token_ids;
+
+    if deck.token_ids.len() == 4 {
+        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
+    }
+
+    write_deck(env.clone(), fee_payer.clone(), deck);
+}
 // pub fn update_place(env: Env) {}
 
 pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
@@ -223,6 +234,47 @@ pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
     write_balance(&env, &balance);
 }
 
+pub fn calculate_deck_balance(env: Env, player_address: Address, deck: &mut Deck) {
+    
+    let mut unique_categories = vec![&env.clone()];
+    let mut total_power = 0;
+    if deck.token_ids.len() == 4 {
+        // check unique categories
+        for id in deck.token_ids.iter() {
+            let _nft = read_nft(&env, player_address.clone(), id.clone()).unwrap();
+            let metadata = read_metadata(&env, id.clone().0);
+            let category = metadata.category;
+
+            total_power += _nft.power;
+
+            if !unique_categories.contains(&category) {
+                unique_categories.push_back(category.clone());
+            }
+        }
+        // calculate bonus
+        let bonus = match unique_categories.len() {
+            1 => 0,
+            2 => 5,
+            3 => 10,
+            4 => 25,
+            _ => 0,
+        };
+
+        // update power balance
+        let mut balance = read_balance(&env);
+        balance.total_deck_power += total_power;
+
+        write_balance(&env, &balance);
+
+        // write deck
+
+        deck.bonus = bonus;
+        deck.total_power = total_power;
+
+        // update haw ai percentages
+        update_haw_ai_percentages(env.clone());
+    }
+}
 // pub fn remove_all_place(env: Env, fee_payer: Address) {
 //     let deck = read_deck(env.clone(), fee_payer.clone());
 
