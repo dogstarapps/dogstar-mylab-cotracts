@@ -1,5 +1,5 @@
 use crate::{user_info::mint_terry, *};
-use admin::{read_balance, read_config, write_balance};
+use admin::{ read_balance, read_config, write_balance, read_state, write_state };
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -151,7 +151,12 @@ pub fn stake(
                 .try_into()
                 .expect("Timestamp exceeds u32 limit"),
         },
-    )
+    );
+
+    let mut state = read_state(&env);
+    state.total_staked_power += staked_power as u64;
+
+    write_state(&env, &state);
 }
 
 pub fn increase_stake_power(

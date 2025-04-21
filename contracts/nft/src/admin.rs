@@ -41,6 +41,7 @@ pub struct State {
     pub total_interest: u64,
     pub total_loan_duration: u64,
     pub total_loan_count: u64,
+    pub total_staked_power: u64,
 }
 
 pub fn has_administrator(e: &Env) -> bool {
@@ -105,6 +106,7 @@ pub fn read_state(e: &Env) -> State {
         total_interest: 0,
         total_loan_duration: 0,
         total_loan_count: 0,
+        total_staked_power: 0,
     })
 }
 

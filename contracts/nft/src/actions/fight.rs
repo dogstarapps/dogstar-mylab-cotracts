@@ -1,9 +1,11 @@
-use crate::{user_info::mint_terry, *};
+use crate::{nft_info::remove_nft, user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Val, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
+
+use super::remove_owner_card;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -207,7 +209,7 @@ pub fn open_position(
 }
 
 pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, fee_payer.clone()).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     nft.locked_by_action = Action::None;
 
@@ -241,7 +243,9 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
     if power < 0 {
         if nft.power < -power as u32 {
             // lose the ownership of the card ???
-            nft.power = 0;
+            // nft.power = 0;
+            remove_owner_card(&env, fee_payer.clone(), token_id.clone());
+            remove_nft(&env, fee_payer.clone(), token_id.clone());
         } else {
             nft.power -= power as u32;
         }
