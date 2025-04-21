@@ -479,6 +479,9 @@ impl NFT {
         deck::place(env, owner, token_id);
     }
 
+    pub fn replace(env: Env, owner: Address, prev_token_id: TokenId, token_id: TokenId) {
+        deck::replace(env, owner, prev_token_id, token_id);
+    }
     // pub fn update_place(
     //     env: Env,
     //     owner: Address,
