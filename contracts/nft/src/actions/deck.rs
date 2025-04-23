@@ -171,6 +171,9 @@ pub fn replace(env: Env, fee_payer: Address, prev_token_id: TokenId, token_id: T
     }
     write_deck(env.clone(), fee_payer.clone(), deck);
 
+    nft.locked_by_action = Action::Deck;
+    write_nft(&env, fee_payer.clone(), token_id.clone(), nft);
+
 }
 
 pub fn update_deck(env: Env, fee_payer: Address, token_ids: Vec<TokenId>) {
