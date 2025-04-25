@@ -309,6 +309,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     );
 
     state.total_offer -= power as u64;
+    state.total_borrowed_power += power as u64;
 
     write_state(&env, &state);
 
@@ -400,6 +401,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
     state.total_interest += interest_amount as u64;
     state.total_offer += borrowing.power as u64;
+    state.total_borrowed_power -= borrowing.power as u64;
 
     write_state(&env, &state);
 
