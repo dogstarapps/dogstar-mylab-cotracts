@@ -166,7 +166,7 @@ pub fn replace(env: Env, fee_payer: Address, prev_token_id: TokenId, token_id: T
 
     write_nft(&env, fee_payer.clone(), prev_token_id.clone(), prev_nft);
     // Update deck
-    if (deck.token_ids.len() == 4) {
+    if deck.token_ids.len() == 4 {
         calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
     }
     write_deck(env.clone(), fee_payer.clone(), deck);

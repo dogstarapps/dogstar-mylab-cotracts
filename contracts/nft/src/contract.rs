@@ -3,9 +3,8 @@
 
 use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
 use crate::admin::{
-    add_level, has_administrator, read_administrator, read_balance, read_config,
-    read_state, update_level, write_administrator, write_balance, write_config,
-    Balance, Config, State,
+    add_level, has_administrator, read_administrator, read_balance, read_config, read_state,
+    update_level, write_administrator, write_balance, write_config, Balance, Config, State,
 };
 use crate::metadata::{read_metadata, write_metadata, CardMetadata};
 use crate::nft_info::{exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency};
@@ -375,13 +374,7 @@ impl NFT {
         token_id: TokenId,
         period_index: u32,
     ) {
-        stake::stake(
-            env,
-            fee_payer,
-            category,
-            token_id,
-            period_index,
-        )
+        stake::stake(env, fee_payer, category, token_id, period_index)
     }
 
     pub fn increase_stake_power(
@@ -419,6 +412,7 @@ impl NFT {
         currency: fight::FightCurrency,
         side_position: SidePosition,
         leverage: u32,
+        power_staked: u32,
     ) {
         fight::open_position(
             env,
@@ -428,6 +422,7 @@ impl NFT {
             currency,
             side_position,
             leverage,
+            power_staked,
         )
     }
 
@@ -438,7 +433,12 @@ impl NFT {
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
         fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
     }
-    pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> fight::Fight {
+    pub fn read_fight(
+        env: Env,
+        fee_payer: Address,
+        category: Category,
+        token_id: TokenId,
+    ) -> fight::Fight {
         fight::read_fight(env, fee_payer, category, token_id)
     }
 }
@@ -464,12 +464,22 @@ impl NFT {
     pub fn get_current_apy(env: Env) -> u64 {
         lending::get_current_apy(env)
     }
-    pub fn read_lending(env: Env, player: Address, category: Category, token_id: TokenId) -> lending::Lending {
+    pub fn read_lending(
+        env: Env,
+        player: Address,
+        category: Category,
+        token_id: TokenId,
+    ) -> lending::Lending {
         lending::read_lending(env, player, category, token_id)
     }
-    pub fn read_borrowing(env: Env, player: Address, category: Category, token_id: TokenId) -> lending::Borrowing {
+    pub fn read_borrowing(
+        env: Env,
+        player: Address,
+        category: Category,
+        token_id: TokenId,
+    ) -> lending::Borrowing {
         lending::read_borrowing(env, player, category, token_id)
-    }    
+    }
 }
 
 // Deck

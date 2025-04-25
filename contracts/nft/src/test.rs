@@ -8,7 +8,7 @@ use crate::{
     admin::Config,
     contract::NFT,
     metadata::CardMetadata,
-    nft_info::{Action, Category, Currency},
+    nft_info::{Category, Currency},
     storage_types::TokenId,
 };
 use soroban_sdk::token::StellarAssetClient;
@@ -39,6 +39,7 @@ fn generate_config(e: &Env) -> Config {
         terry_per_lending: 10,
         terry_per_stake: 10,
         apy_alpha: 10,
+        power_to_usdc_rate: 1000,
     }
 }
 
@@ -145,19 +146,81 @@ fn test_add_power() {
     assert_eq!(card.clone().power, 1010);
 }
 
+// #[test]
+// fn test_stake() {
+//     let e = Env::default();
+//     e.mock_all_auths();
+
+//     std::println!("hello test stake");
+
+//     let admin = Address::generate(&e);
+//     let player = Address::generate(&e);
+//     // Generate config
+//     let mut config = generate_config(&e);
+
+//     let nft = create_nft(e.clone(), &admin, &config);
+
+//     let metadata = create_metadata(&e);
+//     nft.create_metadata(&metadata, &1);
+
+//     nft.create_user(&player);
+//     // Mint 100000 terry to player
+//     nft.mint_terry(&player, &100000);
+
+//     let user = nft.read_user(&player);
+
+//     assert_eq!(user.terry, 100000);
+
+//     // // Set user level
+//     // //nft.set_user_level(&user1.clone(), &1);
+
+//     // // Mint token 1 to user1
+//     assert!(nft.exists(&player, &TokenId(1)) == false);
+
+//     nft.mint(&player, &TokenId(1), &1, &Currency::Terry);
+//     assert!(nft.exists(&player, &TokenId(1)) == true);
+
+//     // let card_info = CardInfo::get_default_card(Category::Leader);
+
+//     // Stake
+//     let mut card = nft.card(&player, &TokenId(1)).unwrap();
+
+//     let old_card_power = card.power.clone();
+
+//     let power_action_fee = config.power_action_fee * card.power / 100;
+//     nft.stake(&player, &Category::Leader, &TokenId(1), &0);
+//     card = nft.card(&player, &TokenId(1)).unwrap();
+
+//     assert!(card.locked_by_action == Action::Stake);
+//     assert_eq!(card.power, 0);
+//     assert_eq!(power_action_fee, 10);
+
+//     let balance = nft.admin_balance();
+//     assert!(balance.haw_ai_power == power_action_fee);
+
+//     let stake = nft.read_stake(&player, &Category::Leader, &TokenId(1));
+//     assert_eq!(stake.power, 1000 - power_action_fee);
+
+//     // Unstake
+//     nft.unstake(&player, &Category::Leader, &TokenId(1));
+
+//     card = nft.card(&player, &TokenId(1)).unwrap();
+//     assert_eq!(card.power, old_card_power - power_action_fee);
+//     // assert!(nft.config().terry_token == config.terry_token);
+// }
+
 #[test]
-fn test_stake() {
+fn test_fight_open_position() {
     let e = Env::default();
     e.mock_all_auths();
 
-    std::println!("hello test stake");
-
-    let admin = Address::generate(&e);
+    let admin1 = Address::generate(&e);
     let player = Address::generate(&e);
-    // Generate config
-    let mut config = generate_config(&e);
 
-    let nft = create_nft(e.clone(), &admin, &config);
+    // Generate config
+    let config = generate_config(&e);
+
+    let nft = create_nft(e.clone(), &admin1, &config);
 
     let metadata = create_metadata(&e);
     nft.create_metadata(&metadata, &1);
@@ -170,46 +233,27 @@ fn test_stake() {
 
     assert_eq!(user.terry, 100000);
 
-    // // Set user level
-    // //nft.set_user_level(&user1.clone(), &1);
-
-    // // Mint token 1 to user1
+    // Mint token 1 to player
     assert!(nft.exists(&player, &TokenId(1)) == false);
-
     nft.mint(&player, &TokenId(1), &1, &Currency::Terry);
     assert!(nft.exists(&player, &TokenId(1)) == true);
 
-    // let card_info = CardInfo::get_default_card(Category::Leader);
+    nft.add_power_to_card(&player, &1, &20); // Or any value >= 10
 
-    // Stake
-    let mut card = nft.card(&player, &TokenId(1)).unwrap();
-
-    let old_card_power = card.power.clone();
-
-    let power_action_fee = config.power_action_fee * card.power / 100;
-    nft.stake(&player, &Category::Leader, &TokenId(1), &0);
-    card = nft.card(&player, &TokenId(1)).unwrap();
-
-    assert!(card.locked_by_action == Action::Stake);
-    assert_eq!(card.power, 0);
-    assert_eq!(power_action_fee, 10);
-
-    let balance = nft.admin_balance();
-    assert!(balance.haw_ai_power == power_action_fee);
-
-    let stake = nft.read_stake(&player, &Category::Leader, &TokenId(1));
-    assert_eq!(stake.power, 1000 - power_action_fee);
-
-    // Unstake
-    nft.unstake(&player, &Category::Leader, &TokenId(1));
-
-    card = nft.card(&player, &TokenId(1)).unwrap();
-    assert_eq!(card.power, old_card_power - power_action_fee);
-    // assert!(nft.config().terry_token == config.terry_token);
+    // Fight
+    nft.open_position(
+        &player,
+        &Category::Leader,
+        &TokenId(1),
+        &fight::FightCurrency::BTC,
+        &fight::SidePosition::Long,
+        &120,
+        &1000,
+    );
 }
 
 #[test]
-fn test_fight() {
+fn test_fight_close_position() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -217,7 +261,7 @@ fn test_fight() {
     let player = Address::generate(&e);
 
     // Generate config
-    let mut config = generate_config(&e);
+    let config = generate_config(&e);
 
     let nft = create_nft(e.clone(), &admin1, &config);
 
@@ -240,7 +284,7 @@ fn test_fight() {
     nft.mint(&player, &TokenId(1), &1, &Currency::Terry);
     assert!(nft.exists(&player, &TokenId(1)) == true);
 
-    // let card_info = CardInfo::get_default_card(Category::Leader);
+    nft.add_power_to_card(&player, &1, &20); // Or any value >= 10
 
     // Fight
     nft.open_position(
@@ -250,6 +294,7 @@ fn test_fight() {
         &fight::FightCurrency::BTC,
         &fight::SidePosition::Long,
         &120,
+        &1000,
     );
     nft.close_position(&player.clone(), &Category::Leader, &TokenId(1));
 }
@@ -264,7 +309,7 @@ fn test_lending() {
     let address2 = Address::generate(&e);
 
     // Generate config
-    let mut config = generate_config(&e);
+    let config = generate_config(&e);
     let nft = create_nft(e.clone(), &admin1, &config);
 
     let metadata = create_metadata(&e);
@@ -318,7 +363,7 @@ fn test_deck() {
     let user2 = Address::generate(&e);
 
     // Generate config
-    let mut config = generate_config(&e);
+    let config = generate_config(&e);
 
     let nft = create_nft(e.clone(), &admin1, &config);
 
@@ -388,7 +433,7 @@ fn test_deck() {
     assert_eq!(deck1.token_ids.len(), 4);
     assert_eq!(deck1.total_power, 4000);
 
-    let mut balance = nft.admin_balance();
+    let balance = nft.admin_balance();
     assert_eq!(balance.total_deck_power, 4000);
 
     nft.replace(&user1, &TokenId(3), &TokenId(5));

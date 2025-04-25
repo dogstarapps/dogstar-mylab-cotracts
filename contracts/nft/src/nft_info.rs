@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, log, Address, Env};
 
 use crate::storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug,Clone, PartialEq)]
 #[contracttype]
 pub enum Category {
     Leader,
@@ -18,7 +18,7 @@ pub enum Currency {
     Xtar,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[contracttype]
 pub enum Action {
     None,

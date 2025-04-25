@@ -20,6 +20,7 @@ pub struct Config {
     pub terry_per_lending: i128,
     pub terry_per_stake: i128,
     pub apy_alpha: u32,
+    pub power_to_usdc_rate: i128, // e.g., 1000 for 0.10 USDC per POWER (1000/10000 = 0.10)
 }
 
 #[contracttype]
