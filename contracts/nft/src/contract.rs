@@ -449,6 +449,10 @@ impl NFT {
     pub fn read_fights(env: Env) -> Vec<fight::Fight> {
         fight::read_fights(env)
     }
+    pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+        fight::check_liquidation(env, fee_payer, category, token_id)
+    }
+    
 }
 
 // Lend & Borrow

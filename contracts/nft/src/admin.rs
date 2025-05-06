@@ -1,5 +1,5 @@
 use crate::storage_types::{DataKey, Level};
-use soroban_sdk::{contracttype, Address, Env, Vec};
+use soroban_sdk::{contracttype, Address, Env, Vec, symbol_short};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -98,6 +98,11 @@ pub fn read_balance(e: &Env) -> Balance {
 pub fn write_state(e: &Env, state: &State) {
     let key = DataKey::State;
     e.storage().persistent().set(&key, state);
+
+    e.events().publish(
+        (symbol_short!("state"),),
+        state.clone(),
+    );
 }
 
 pub fn read_state(e: &Env) -> State {
