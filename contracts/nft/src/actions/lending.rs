@@ -5,7 +5,7 @@ use crate::{
 };
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, Vec};
+use soroban_sdk::{contracttype, vec, Address, Env, Vec, symbol_short};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
 
@@ -138,9 +138,9 @@ pub fn write_borrowing(
             && borrowing.category == category
             && borrowing.token_id == token_id
     }) {
-        borrowings.set(pos.try_into().unwrap(), borrowing)
+        borrowings.set(pos.try_into().unwrap(), borrowing.clone())
     } else {
-        borrowings.push_back(borrowing)
+        borrowings.push_back(borrowing.clone())
     }
 
     env.storage().persistent().set(&key, &borrowings);
@@ -148,6 +148,7 @@ pub fn write_borrowing(
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+    env.events().publish((symbol_short!("borrowing"), symbol_short!("open")), borrowing);
 }
 
 pub fn read_borrowing(
@@ -167,7 +168,7 @@ pub fn read_borrowing(
 }
 
 pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, fee_payer.clone()).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -186,6 +187,8 @@ pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_
             && borrowing.category == category
             && borrowing.token_id == token_id
     }) {
+        let borrowing = read_borrowing(env.clone(), fee_payer.clone(), category.clone(), token_id.clone());
+        env.events().publish((symbol_short!("borrowing"), symbol_short!("close")), borrowing.clone());
         borrowings.remove(pos.try_into().unwrap());
     }
 
@@ -429,8 +432,48 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     write_balance(&env, &balance);
 }
 
-fn liquidate(env: Env) {
+fn check_liquidations(env: Env) {
     for borrowing in read_borrowings(env.clone()) {
+        let nft = read_nft(&env, borrowing.borrower.clone(), borrowing.token_id.clone()).unwrap();
+
+        let config = read_config(&env);
+        let mut state = read_state(&env);
+        let apy = calculate_apy(
+            state.total_demand,
+            state.total_offer,
+            state.total_loan_duration,
+            state.total_loan_count,
+            config.apy_alpha as u64,
+        );
+        let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
+        let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
+
+        if nft.power < borrowing.power + interest_amount as u32 {
+            state.total_interest += nft.power as u64;
+
+            write_state(&env, &state);
+            remove_borrowing(
+                env.clone(),
+                borrowing.borrower,
+                borrowing.category,
+                borrowing.token_id,
+            );
+        }
+    }
+}
+
+fn liquidate(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+    fee_payer.require_auth();
+    let user = read_user(&env, fee_payer);
+    let owner = user.owner.clone();
+
+    let borrowing = read_borrowing(
+        env.clone(),
+        owner.clone(),
+        category.clone(),
+        token_id.clone(),
+    );
+    if borrowing.borrower == owner {
         let nft = read_nft(&env, borrowing.borrower.clone(), borrowing.token_id.clone()).unwrap();
 
         let config = read_config(&env);
@@ -497,7 +540,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration);
 
     if state.total_interest < interest_amount {
-        liquidate(env.clone());
+        check_liquidations(env.clone());
     }
 
     state = read_state(&env);

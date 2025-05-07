@@ -1,7 +1,7 @@
 use crate::{nft_info::remove_nft, user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
@@ -72,9 +72,9 @@ pub fn write_fight(
     if let Some(pos) = fights.iter().position(|fight| {
         fight.owner == owner && fight.category == category && fight.token_id == token_id
     }) {
-        fights.set(pos.try_into().unwrap(), fight)
+        fights.set(pos.try_into().unwrap(), fight.clone())
     } else {
-        fights.push_back(fight);
+        fights.push_back(fight.clone());
     }
 
     env.storage().persistent().set(&key, &fights);
@@ -82,6 +82,8 @@ pub fn write_fight(
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
+    env.events().publish((symbol_short!("fight"), symbol_short!("open")), fight.clone())
 }
 
 pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
@@ -106,12 +108,18 @@ pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: 
             BALANCE_BUMP_AMOUNT,
         );
     }
-
     let key = DataKey::Fights;
     let mut fights = read_fights(env.clone());
     if let Some(pos) = fights.iter().position(|fight| {
         fight.owner == owner && fight.category == category && fight.token_id == token_id
     }) {
+        let fight = read_fight(
+            env.clone(),
+            owner.clone(),
+            category.clone(),
+            token_id.clone(),
+        );
+        env.events().publish((symbol_short!("fight"), symbol_short!("close")), fight.clone());
         fights.remove(pos.try_into().unwrap());
     }
 

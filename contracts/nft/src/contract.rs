@@ -1,7 +1,7 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
 
-use crate::actions::{burn, deck, fight, lending, stake, Deck, SidePosition};
+use crate::actions::{burn, deck, fight, lending, lending::{Lending, Borrowing}, stake, Deck, SidePosition};
 use crate::admin::{
     add_level, has_administrator, read_administrator, read_balance, read_config, read_state,
     update_level, write_administrator, write_balance, write_config, Balance, Config, State,
@@ -399,6 +399,10 @@ impl NFT {
     ) -> stake::Stake {
         stake::read_stake(env, fee_payer, category, token_id)
     }
+
+    pub fn read_stakes(env: Env) -> Vec<stake::Stake> {
+        stake::read_stakes(env)
+    }
 }
 
 // Fight
@@ -441,6 +445,14 @@ impl NFT {
     ) -> fight::Fight {
         fight::read_fight(env, fee_payer, category, token_id)
     }
+
+    pub fn read_fights(env: Env) -> Vec<fight::Fight> {
+        fight::read_fights(env)
+    }
+    pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+        fight::check_liquidation(env, fee_payer, category, token_id)
+    }
+    
 }
 
 // Lend & Borrow
@@ -479,6 +491,12 @@ impl NFT {
         token_id: TokenId,
     ) -> lending::Borrowing {
         lending::read_borrowing(env, player, category, token_id)
+    }
+    pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
+        lending::read_borrowings(env)
+    }
+    pub fn read_lendings(env: Env) -> Vec<Lending> {
+        lending::read_lendings(env)
     }
 }
 
