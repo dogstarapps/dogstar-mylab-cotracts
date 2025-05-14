@@ -132,7 +132,6 @@ pub fn mint_terry(e: &Env, owner: Address, amount: i128) {
     user.total_history_terry += amount;
     user.level = get_user_level(e, owner.clone());
     write_user(e, user.owner.clone(), user);
-    log!(&e, "mint_terry >> Minted terry {}", amount);
 }
 
 pub fn burn_terry(e: &Env, owner: Address, amount: i128) {

@@ -83,7 +83,10 @@ pub fn write_fight(
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 
-    env.events().publish((symbol_short!("fight"), symbol_short!("open")), fight.clone())
+    env.events().publish(
+        (symbol_short!("fight"), symbol_short!("open")),
+        fight.clone(),
+    )
 }
 
 pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
@@ -101,13 +104,6 @@ pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
 
-    if env.storage().persistent().has(&key) {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    }
     let key = DataKey::Fights;
     let mut fights = read_fights(env.clone());
     if let Some(pos) = fights.iter().position(|fight| {
@@ -119,7 +115,10 @@ pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: 
             category.clone(),
             token_id.clone(),
         );
-        env.events().publish((symbol_short!("fight"), symbol_short!("close")), fight.clone());
+        env.events().publish(
+            (symbol_short!("fight"), symbol_short!("close")),
+            fight.clone(),
+        );
         fights.remove(pos.try_into().unwrap());
     }
 
@@ -303,7 +302,7 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
     }
     #[cfg(test)]
     {
-        current_price = 8600000000; // Mock price for tests (86,000 USDC)
+        current_price = 86000; // Mock price for tests (86,000 USDC)
     }
     assert!(current_price > 0, "Invalid oracle price");
     assert!(fight.trigger_price > 0, "Invalid trigger price");

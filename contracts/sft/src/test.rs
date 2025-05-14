@@ -2,9 +2,7 @@
 extern crate std;
 
 use crate::{contract::SFT, storage_types::TokenId, SFTClient};
-use soroban_sdk::{
-    testutils::Address as _, vec, Address, Env, IntoVal, Vec
-};
+use soroban_sdk::{testutils::Address as _, vec, Address, Env, IntoVal, Vec};
 
 fn create_sft<'a>(e: &Env, admin: &Address) -> SFTClient<'a> {
     let sft: SFTClient = SFTClient::new(e, &e.register_contract(None, SFT {}));

@@ -5,8 +5,8 @@ use crate::admin::{has_administrator, read_administrator, write_administrator};
 use crate::allowance::{read_approval_for_all, read_approved, write_approval_for_all};
 use crate::balance::{read_balance, write_balance};
 use crate::metadata::{read_metadata, write_metadata, SFTMetadata};
-use crate::storage_types::{TokenId};
-use crate::storage_types::{INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT};
+use crate::storage_types::TokenId;
+use crate::storage_types::{INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD};
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
 use soroban_token_sdk::TokenUtils;
 
@@ -15,13 +15,7 @@ pub struct SFT;
 
 #[contractimpl]
 impl SFT {
-    pub fn initialize(
-        e: Env,
-        admin: Address,
-        name: String,
-        symbol: String,
-        base_uri: String,
-    ) {
+    pub fn initialize(e: Env, admin: Address, name: String, symbol: String, base_uri: String) {
         if has_administrator(&e) {
             panic!("already initialized")
         }
@@ -61,28 +55,31 @@ impl SFT {
         read_metadata(&env).base_uri
     }
 
-    pub fn mint(
-        env: Env,
-        to: Address,
-        id: TokenId,
-        amount: u64,
-    ) {
+    pub fn mint(env: Env, to: Address, id: TokenId, amount: u64) {
         assert!(amount > 0, "Amount must be greater than zero");
-        write_balance(&env, to.clone(), id.clone(), read_balance(&env, to.clone(), id.clone()) + amount);
+        write_balance(
+            &env,
+            to.clone(),
+            id.clone(),
+            read_balance(&env, to.clone(), id.clone()) + amount,
+        );
     }
 
-    pub fn mint_batch(
-        env: Env,
-        to: Address,
-        ids: Vec<TokenId>,
-        amounts: Vec<u64>,
-    ) {
-        assert!(ids.len() == amounts.len(), "IDs and amounts length mismatch");
+    pub fn mint_batch(env: Env, to: Address, ids: Vec<TokenId>, amounts: Vec<u64>) {
+        assert!(
+            ids.len() == amounts.len(),
+            "IDs and amounts length mismatch"
+        );
         for i in 0..ids.len() {
             let id = ids.get(i).unwrap();
             let amount = amounts.get(i).unwrap();
             assert!(amount > 0, "Amount must be greater than zero");
-            write_balance(&env, to.clone(), id.clone(), read_balance(&env, to.clone(), id.clone()) + amount);
+            write_balance(
+                &env,
+                to.clone(),
+                id.clone(),
+                read_balance(&env, to.clone(), id.clone()) + amount,
+            );
         }
     }
 
@@ -110,18 +107,22 @@ impl SFT {
         read_approval_for_all(&env, owner, operator)
     }
 
-    pub fn transfer(
-        env: Env,
-        from: Address,
-        to: Address,
-        id: TokenId,
-        amount: u64,
-    ) {
+    pub fn transfer(env: Env, from: Address, to: Address, id: TokenId, amount: u64) {
         assert!(amount > 0, "Amount must be greater than zero");
         from.require_auth();
-        
-        write_balance(&env, from.clone(), id.clone(), read_balance(&env, from.clone(), id.clone()) - amount);
-        write_balance(&env, to.clone(), id.clone(), read_balance(&env, to.clone(), id.clone()) + amount);
+
+        write_balance(
+            &env,
+            from.clone(),
+            id.clone(),
+            read_balance(&env, from.clone(), id.clone()) - amount,
+        );
+        write_balance(
+            &env,
+            to.clone(),
+            id.clone(),
+            read_balance(&env, to.clone(), id.clone()) + amount,
+        );
     }
 
     pub fn transfer_from(
@@ -134,13 +135,25 @@ impl SFT {
     ) {
         assert!(amount > 0, "Amount must be greater than zero");
         spender.require_auth();
-        
+
         assert!(
-            spender == from || read_approval_for_all(&env, from.clone(), spender.clone()) || Some(spender.clone()) == read_approved(&env, id.clone()),
+            spender == from
+                || read_approval_for_all(&env, from.clone(), spender.clone())
+                || Some(spender.clone()) == read_approved(&env, id.clone()),
             "Caller is not owner nor approved"
         );
-        write_balance(&env, from.clone(), id.clone(), read_balance(&env, from.clone(), id.clone()) - amount);
-        write_balance(&env, to.clone(), id.clone(), read_balance(&env, to.clone(), id.clone()) + amount);
+        write_balance(
+            &env,
+            from.clone(),
+            id.clone(),
+            read_balance(&env, from.clone(), id.clone()) - amount,
+        );
+        write_balance(
+            &env,
+            to.clone(),
+            id.clone(),
+            read_balance(&env, to.clone(), id.clone()) + amount,
+        );
     }
 
     pub fn batch_transfer(
@@ -150,24 +163,32 @@ impl SFT {
         ids: Vec<TokenId>,
         amounts: Vec<u64>,
     ) {
-        assert!(ids.len() == amounts.len(), "IDs and amounts length mismatch");
+        assert!(
+            ids.len() == amounts.len(),
+            "IDs and amounts length mismatch"
+        );
         from.require_auth();
-        
+
         for i in 0..ids.len() {
             let id = ids.get(i).unwrap();
             let amount = amounts.get(i).unwrap();
             assert!(amount > 0, "Amount must be greater than zero");
-            write_balance(&env, from.clone(), id.clone(), read_balance(&env, from.clone(), id.clone()) - amount);
-            write_balance(&env, to.clone(), id.clone(), read_balance(&env, to.clone(), id.clone()) + amount);
+            write_balance(
+                &env,
+                from.clone(),
+                id.clone(),
+                read_balance(&env, from.clone(), id.clone()) - amount,
+            );
+            write_balance(
+                &env,
+                to.clone(),
+                id.clone(),
+                read_balance(&env, to.clone(), id.clone()) + amount,
+            );
         }
     }
 
-    pub fn burn(
-        env: Env,
-        from: Address,
-        id: TokenId,
-        amount: u64,
-    ) {
+    pub fn burn(env: Env, from: Address, id: TokenId, amount: u64) {
         assert!(amount > 0, "Amount must be greater than zero");
         from.require_auth();
         let balance = read_balance(&env, from.clone(), id.clone());
@@ -175,13 +196,11 @@ impl SFT {
         write_balance(&env, from.clone(), id.clone(), balance - amount);
     }
 
-    pub fn burn_batch(
-        env: Env,
-        from: Address,
-        ids: Vec<TokenId>,
-        amounts: Vec<u64>,
-    ) {
-        assert!(ids.len() == amounts.len(), "IDs and amounts length mismatch");
+    pub fn burn_batch(env: Env, from: Address, ids: Vec<TokenId>, amounts: Vec<u64>) {
+        assert!(
+            ids.len() == amounts.len(),
+            "IDs and amounts length mismatch"
+        );
         from.require_auth();
         for i in 0..ids.len() {
             let id = ids.get(i).unwrap();
