@@ -1,19 +1,7 @@
 use crate::error::MyLabError;
 use crate::nft_info::read_nft;
-use crate::storage_types::{
-    DataKey, Level, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD,
-};
-use soroban_sdk::{contracttype, log, Address, Env, Vec};
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct User {
-    pub owner: Address,
-    pub power: u32,
-    pub terry: i128,
-    pub total_history_terry: i128,
-    pub level: u32,
-}
+use crate::storage_types::{DataKey, Level, TokenId, User};
+use soroban_sdk::{log, Address, Env, Vec};
 
 pub fn add_card_to_owner(env: &Env, token_id: TokenId, user: Address) -> Result<(), MyLabError> {
     log!(&env, "Add card to owner function");
@@ -37,6 +25,9 @@ pub fn add_card_to_owner(env: &Env, token_id: TokenId, user: Address) -> Result<
     }
 }
 
+// TODO:
+// read_user shoudld either return a user or return an error of not found
+
 pub fn read_user(e: &Env, user: Address) -> User {
     let key = DataKey::User(user.clone());
     e.storage().persistent().get(&key).unwrap_or(User {
@@ -48,13 +39,15 @@ pub fn read_user(e: &Env, user: Address) -> User {
     })
 }
 
-pub fn write_user(e: &Env, fee_payer: Address, user_info: User) {
-    let key = DataKey::User(fee_payer);
+pub fn write_user(e: &Env, user: Address, user_info: User) {
+    user.require_auth();
+    let key = DataKey::User(user);
     e.storage().persistent().set(&key, &user_info);
 }
 
-pub fn get_user_level(e: &Env, fee_payer: Address) -> u32 {
-    let user = read_user(&e, fee_payer.clone());
+pub fn get_user_level(e: &Env, user: Address) -> u32 {
+    user.require_auth();
+    let user = read_user(&e, user.clone());
     let balance = user.total_history_terry;
     log!(&e, "get_user_level >> User balance {}", balance);
 
@@ -85,14 +78,6 @@ pub fn write_owner_card(env: &Env, owner: Address, token_ids: Vec<TokenId>) {
     );
     let key = DataKey::OwnerOwnedCardIds(owner);
     env.storage().persistent().set(&key, &token_ids);
-    #[cfg(not(test))]
-    {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    }
 }
 
 pub fn read_owner_card(env: &Env, owner: Address) -> Vec<TokenId> {
@@ -115,14 +100,6 @@ pub fn read_owner_card(env: &Env, owner: Address) -> Vec<TokenId> {
         .get(&key)
         .unwrap_or_else(|| Vec::new(&env));
 
-    #[cfg(not(test))]
-    {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    };
     return card_list;
 }
 
@@ -132,7 +109,6 @@ pub fn mint_terry(e: &Env, owner: Address, amount: i128) {
     user.total_history_terry += amount;
     user.level = get_user_level(e, owner.clone());
     write_user(e, user.owner.clone(), user);
-    log!(&e, "mint_terry >> Minted terry {}", amount);
 }
 
 pub fn burn_terry(e: &Env, owner: Address, amount: i128) {

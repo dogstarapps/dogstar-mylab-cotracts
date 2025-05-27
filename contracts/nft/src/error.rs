@@ -9,3 +9,11 @@ pub enum MyLabError {
     NotAuthorized = 302,
     OutOfBounds = 303,
 }
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum NFTError {
+    AlreadyInitialized = 1,
+    RoundAlreadyProcessed = 2,
+}
