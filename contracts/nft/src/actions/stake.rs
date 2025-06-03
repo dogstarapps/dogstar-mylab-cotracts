@@ -1,7 +1,7 @@
 use crate::{user_info::mint_terry, *};
 use admin::{ read_balance, read_config, write_balance, read_state, write_state };
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, Vec};
+use soroban_sdk::{contracttype, vec, Address, Env, Vec, symbol_short};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
@@ -133,30 +133,34 @@ pub fn stake(
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
+    let stake = Stake {
+        owner: owner.clone(),
+        category: category.clone(),
+        token_id: token_id.clone(),
+        power: staked_power,
+        period: config.stake_periods.get(period_index).unwrap(),
+        interest_percentage: config.stake_interest_percentages.get(period_index).unwrap(),
+        staked_time: env
+            .ledger()
+            .timestamp()
+            .try_into()
+            .expect("Timestamp exceeds u32 limit"),
+    };
+
     write_stake(
         &env,
         owner.clone(),
         category.clone(),
         token_id.clone(),
-        Stake {
-            owner,
-            category,
-            token_id,
-            power: staked_power,
-            period: config.stake_periods.get(period_index).unwrap(),
-            interest_percentage: config.stake_interest_percentages.get(period_index).unwrap(),
-            staked_time: env
-                .ledger()
-                .timestamp()
-                .try_into()
-                .expect("Timestamp exceeds u32 limit"),
-        },
+        stake.clone(),
     );
 
     let mut state = read_state(&env);
     state.total_staked_power += staked_power as u64;
 
     write_state(&env, &state);
+
+    env.events().publish((symbol_short!("stake"), symbol_short!("open")), stake);
 }
 
 pub fn increase_stake_power(
