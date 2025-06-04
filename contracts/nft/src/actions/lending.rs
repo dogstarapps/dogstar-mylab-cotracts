@@ -5,7 +5,7 @@ use crate::{
 };
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, Vec, symbol_short};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
 
@@ -148,7 +148,10 @@ pub fn write_borrowing(
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-    env.events().publish((symbol_short!("borrowing"), symbol_short!("open")), borrowing);
+    env.events().publish(
+        (symbol_short!("borrowing"), symbol_short!("open")),
+        borrowing,
+    );
 }
 
 pub fn read_borrowing(
@@ -187,8 +190,16 @@ pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_
             && borrowing.category == category
             && borrowing.token_id == token_id
     }) {
-        let borrowing = read_borrowing(env.clone(), fee_payer.clone(), category.clone(), token_id.clone());
-        env.events().publish((symbol_short!("borrowing"), symbol_short!("close")), borrowing.clone());
+        let borrowing = read_borrowing(
+            env.clone(),
+            fee_payer.clone(),
+            category.clone(),
+            token_id.clone(),
+        );
+        env.events().publish(
+            (symbol_short!("borrowing"), symbol_short!("close")),
+            borrowing.clone(),
+        );
         borrowings.remove(pos.try_into().unwrap());
     }
 

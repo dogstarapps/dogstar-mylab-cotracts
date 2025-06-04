@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, log, Address, Env};
 
 use crate::storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 
-#[derive(Debug,Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[contracttype]
 pub enum Category {
     Leader,
@@ -58,16 +58,26 @@ impl CardInfo {
 }
 
 pub fn write_nft(env: &Env, owner: Address, token_id: TokenId, card: Card) {
-    log!(&env, "write_nft >> Write nft for {}, token id {}", owner.clone(), token_id.clone());
-    let key = DataKey::Card( owner, token_id);
+    log!(
+        &env,
+        "write_nft >> Write nft for {}, token id {}",
+        owner.clone(),
+        token_id.clone()
+    );
+    let key = DataKey::Card(owner, token_id);
     env.storage().persistent().set(&key, &card);
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_nft(env: &Env, owner: Address,  token_id: TokenId,) -> Option<Card> {
-    log!(&env, "read_nft >> Read nft for {}, token id {}", owner.clone(), token_id.clone());
+pub fn read_nft(env: &Env, owner: Address, token_id: TokenId) -> Option<Card> {
+    log!(
+        &env,
+        "read_nft >> Read nft for {}, token id {}",
+        owner.clone(),
+        token_id.clone()
+    );
     let key = DataKey::Card(owner, token_id);
     env.storage()
         .persistent()
@@ -76,11 +86,11 @@ pub fn read_nft(env: &Env, owner: Address,  token_id: TokenId,) -> Option<Card> 
 }
 
 pub fn exists(env: &Env, owner: Address, token_id: TokenId) -> bool {
-    let key: DataKey = DataKey::Card( owner, token_id.clone());
-    env.storage().persistent().has(&key)    
+    let key: DataKey = DataKey::Card(owner, token_id.clone());
+    env.storage().persistent().has(&key)
 }
 
-pub fn remove_nft(env: &Env, owner: Address,  token_id: TokenId) {
+pub fn remove_nft(env: &Env, owner: Address, token_id: TokenId) {
     let key = DataKey::Card(owner, token_id.clone());
     env.storage()
         .persistent()

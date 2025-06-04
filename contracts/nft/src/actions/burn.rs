@@ -1,33 +1,31 @@
+use crate::contract::NFT;
 use crate::{user_info::mint_terry, *};
-use admin::{read_balance, read_config, write_balance};
+use admin::read_config;
 use nft_info::{read_nft, remove_nft};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
 use user_info::{read_owner_card, read_user, write_owner_card};
 
 pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
-    // fee_payer.require_auth();
+    //fee_payer.require_auth();
     let owner = read_user(&env, fee_payer.clone()).owner;
 
     let config = read_config(&env);
-
     let nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
 
+    // Calculate Terry and Power amounts
     let terry_amount = config.terry_per_power * nft.power as i128;
     let receive_amount = terry_amount * config.burn_receive_percentage as i128 / 100;
-    let haw_ai_amount = terry_amount - receive_amount;
+    let pot_terry = terry_amount - receive_amount; // Terry to pot
+    let pot_power = nft.power * (100 - config.burn_receive_percentage) / 100; // Power to pot
 
-    // mint 50% of terry amount to the owner
+    // Mint owner's share
     mint_terry(&env, fee_payer.clone(), receive_amount);
 
-    let mut balance = read_balance(&env);
-    // update haw ai terry balance and power balance
-    balance.haw_ai_terry += haw_ai_amount;
-    let haw_ai_power = nft.power * config.burn_receive_percentage / 100;
-    balance.haw_ai_power += haw_ai_power;
+    // Accumulate to pot with Dogstar fee deduction
+    NFT::accumulate_pot(env.clone(), pot_terry, pot_power, 0);
 
-    write_balance(&env, &balance);
-
+    // Remove card and NFT
     remove_owner_card(&env, owner.clone(), token_id.clone());
     remove_nft(&env, owner, token_id);
 }

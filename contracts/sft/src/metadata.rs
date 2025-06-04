@@ -1,4 +1,4 @@
-use soroban_sdk::{Env, String, contracttype};
+use soroban_sdk::{contracttype, Env, String};
 
 use crate::storage_types::DataKey;
 

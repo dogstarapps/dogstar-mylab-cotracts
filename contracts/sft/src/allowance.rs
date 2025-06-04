@@ -16,7 +16,10 @@ pub fn write_approved(env: &Env, id: TokenId, approved: Option<Address>) {
 
 pub fn read_approval_for_all(env: &Env, owner: Address, operator: Address) -> bool {
     let key = DataKey::ApprovalForAll(owner, operator);
-    env.storage().persistent().get::<DataKey, bool>(&key).unwrap_or(false)
+    env.storage()
+        .persistent()
+        .get::<DataKey, bool>(&key)
+        .unwrap_or(false)
 }
 
 pub fn write_approval_for_all(env: &Env, owner: Address, operator: Address, approved: bool) {

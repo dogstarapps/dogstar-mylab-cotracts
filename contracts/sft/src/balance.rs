@@ -4,9 +4,11 @@ use soroban_sdk::{Address, Env};
 pub fn read_balance(env: &Env, addr: Address, id: TokenId) -> u64 {
     let key = DataKey::Balance(addr, id);
     if let Some(balance) = env.storage().persistent().get::<DataKey, u64>(&key) {
-        env.storage()
-            .persistent()
-            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+        env.storage().persistent().extend_ttl(
+            &key,
+            BALANCE_LIFETIME_THRESHOLD,
+            BALANCE_BUMP_AMOUNT,
+        );
         balance
     } else {
         0

@@ -1,13 +1,15 @@
 #![no_std]
 
+mod actions;
 mod admin;
 mod contract;
-mod user_info;
-mod nft_info;
-mod storage_types;
-mod actions;
+mod error;
+mod event;
 mod metadata;
-mod error; 
+mod nft_info;
+mod pot;
+mod storage_types;
+mod user_info;
 
 mod test;
 
