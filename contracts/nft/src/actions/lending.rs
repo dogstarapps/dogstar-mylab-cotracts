@@ -583,4 +583,3 @@ pub fn get_current_apy(env: Env) -> u64 {
         config.apy_alpha as u64,
     )
 }
-.
