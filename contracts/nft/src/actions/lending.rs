@@ -35,12 +35,12 @@ pub struct Borrowing {
 
 pub fn write_lending(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     lending: Lending,
 ) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &lending);
@@ -65,13 +65,8 @@ pub fn write_lending(
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_lending(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-) -> Lending {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_lending(env: Env, user: Address, category: Category, token_id: TokenId) -> Lending {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -80,8 +75,8 @@ pub fn read_lending(
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn remove_lending(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -118,12 +113,12 @@ pub fn read_lendings(env: Env) -> Vec<Lending> {
 
 pub fn write_borrowing(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     borrowing: Borrowing,
 ) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &borrowing);
@@ -154,14 +149,9 @@ pub fn write_borrowing(
     );
 }
 
-pub fn read_borrowing(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-) -> Borrowing {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) -> Borrowing {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -170,8 +160,8 @@ pub fn read_borrowing(
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer.clone()).owner;
+pub fn remove_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user.clone()).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -192,7 +182,7 @@ pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_
     }) {
         let borrowing = read_borrowing(
             env.clone(),
-            fee_payer.clone(),
+            user.clone(),
             category.clone(),
             token_id.clone(),
         );
@@ -243,9 +233,9 @@ fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
     principal * apy * loan_duration / 8_760 / SCALE
 }
 
-pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
 
     assert!(
         category == Category::Resource || category == Category::Leader,
@@ -298,9 +288,9 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
     write_balance(&env, &balance);
 }
 
-pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer.clone());
+pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
+    user.require_auth();
+    let mut user = read_user(&env, user.clone());
     let owner = user.owner.clone();
 
     assert!(
@@ -373,9 +363,9 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     write_balance(&env, &balance);
 }
 
-pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer);
+pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let mut user = read_user(&env, user);
     let owner = user.owner.clone();
 
     assert!(
@@ -473,9 +463,9 @@ fn check_liquidations(env: Env) {
     }
 }
 
-fn liquidate(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let user = read_user(&env, fee_payer);
+fn liquidate(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let user = read_user(&env, user);
     let owner = user.owner.clone();
 
     let borrowing = read_borrowing(
@@ -513,9 +503,9 @@ fn liquidate(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     }
 }
 
-pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer);
+pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let mut user = read_user(&env, user);
     let owner = user.owner.clone();
 
     assert!(
@@ -593,3 +583,4 @@ pub fn get_current_apy(env: Env) -> u64 {
         config.apy_alpha as u64,
     )
 }
+.

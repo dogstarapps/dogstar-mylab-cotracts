@@ -72,7 +72,7 @@ pub fn read_state(e: &Env) -> State {
 }
 
 pub fn add_level(e: &Env, level: Level) -> u32 {
-    let level_id = get_and_inc_level_id(&e);
+    let level_id = get_and_increase_level_id(&e);
     e.storage()
         .persistent()
         .set(&DataKey::Level(level_id), &level);
@@ -86,7 +86,7 @@ pub fn update_level(e: &Env, level_id: u32, level: Level) {
         .set(&DataKey::Level(level_id), &level);
 }
 
-pub fn get_and_inc_level_id(env: &Env) -> u32 {
+pub fn get_and_increase_level_id(env: &Env) -> u32 {
     let prev = env
         .storage()
         .persistent()

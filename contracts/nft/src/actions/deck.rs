@@ -6,8 +6,8 @@ use soroban_sdk::{log, vec, Address, Env, Vec};
 use storage_types::{DataKey, Deck, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
-fn write_deck(env: Env, fee_payer: Address, deck: Deck) {
-    let owner = read_user(&env, fee_payer).owner;
+fn write_deck(env: Env, user: Address, deck: Deck) {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Deck(owner.clone());
     env.storage().persistent().set(&key, &deck);
@@ -42,8 +42,8 @@ fn read_decks(env: Env) -> Vec<Deck> {
         .unwrap_or(vec![&env.clone()])
 }
 
-// fn remove_deck(env: Env, fee_payer: Address) {
-//     let owner = read_user(&env, fee_payer).owner;
+// fn remove_deck(env: Env, user: Address) {
+//     let owner = read_user(&env, user).owner;
 //     let key = DataKey::Deck(owner.clone());
 //     env.storage().persistent().remove(&key);
 //     if env.storage().persistent().has(&key) {
@@ -67,8 +67,8 @@ fn read_decks(env: Env) -> Vec<Deck> {
 //         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 // }
 
-pub fn read_deck(env: Env, fee_payer: Address) -> Deck {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_deck(env: Env, user: Address) -> Deck {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Deck(owner.clone());
     let new_deck = Deck {
@@ -97,12 +97,12 @@ pub fn read_deck(env: Env, fee_payer: Address) -> Deck {
         .unwrap_or(new_deck.clone())
 }
 
-pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
-    let mut deck = read_deck(env.clone(), fee_payer.clone());
+pub fn place(env: Env, user: Address, token_id: TokenId) {
+    let mut deck = read_deck(env.clone(), user.clone());
 
     assert!(deck.token_ids.len() < 4, "Decks are exceed!");
 
-    let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+    let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
 
     assert!(
         nft.locked_by_action == Action::None,
@@ -111,33 +111,33 @@ pub fn place(env: Env, fee_payer: Address, token_id: TokenId) {
 
     nft.locked_by_action = Action::Deck;
 
-    write_nft(&env, fee_payer.clone(), token_id.clone(), nft.clone());
+    write_nft(&env, user.clone(), token_id.clone(), nft.clone());
     deck.token_ids.push_back(token_id.clone());
 
     if deck.token_ids.len() == 4 {
-        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
+        calculate_deck_balance(env.clone(), user.clone(), &mut deck);
     }
-    write_deck(env.clone(), fee_payer.clone(), deck);
+    write_deck(env.clone(), user.clone(), deck);
 
     let config = read_config(&env);
-    mint_terry(&env, fee_payer.clone(), config.terry_per_deck);
+    mint_terry(&env, user.clone(), config.terry_per_deck);
 
     let mut balance = read_balance(&env);
     balance.haw_ai_terry += config.terry_per_deck * config.haw_ai_percentage as i128 / 100;
     write_balance(&env, &balance);
 }
 
-pub fn replace(env: Env, fee_payer: Address, prev_token_id: TokenId, token_id: TokenId) {
-    let mut deck = read_deck(env.clone(), fee_payer.clone());
+pub fn replace(env: Env, user: Address, prev_token_id: TokenId, token_id: TokenId) {
+    let mut deck = read_deck(env.clone(), user.clone());
 
-    let mut prev_nft = read_nft(&env, fee_payer.clone(), prev_token_id.clone()).unwrap();
+    let mut prev_nft = read_nft(&env, user.clone(), prev_token_id.clone()).unwrap();
 
     assert!(
         prev_nft.locked_by_action == Action::Deck,
         "Not locked by Deck"
     );
 
-    let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+    let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
     assert!(
         nft.locked_by_action == Action::None,
         "Locked by other action"
@@ -153,35 +153,35 @@ pub fn replace(env: Env, fee_payer: Address, prev_token_id: TokenId, token_id: T
     }
     prev_nft.locked_by_action = Action::None;
 
-    write_nft(&env, fee_payer.clone(), prev_token_id.clone(), prev_nft);
+    write_nft(&env, user.clone(), prev_token_id.clone(), prev_nft);
     if deck.token_ids.len() == 4 {
-        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
+        calculate_deck_balance(env.clone(), user.clone(), &mut deck);
     }
-    write_deck(env.clone(), fee_payer.clone(), deck);
+    write_deck(env.clone(), user.clone(), deck);
 
     nft.locked_by_action = Action::Deck;
-    write_nft(&env, fee_payer.clone(), token_id.clone(), nft);
+    write_nft(&env, user.clone(), token_id.clone(), nft);
 }
 
-pub fn update_deck(env: Env, fee_payer: Address, token_ids: Vec<TokenId>) {
-    let mut deck = read_deck(env.clone(), fee_payer.clone());
+pub fn update_deck(env: Env, user: Address, token_ids: Vec<TokenId>) {
+    let mut deck = read_deck(env.clone(), user.clone());
 
     assert!(token_ids.len() <= 4, "Decks cannot exceed 4 cards!");
 
     deck.token_ids = token_ids;
 
     if deck.token_ids.len() == 4 {
-        calculate_deck_balance(env.clone(), fee_payer.clone(), &mut deck);
+        calculate_deck_balance(env.clone(), user.clone(), &mut deck);
     }
-    write_deck(env.clone(), fee_payer.clone(), deck);
+    write_deck(env.clone(), user.clone(), deck);
 }
 
-pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
-    let mut deck = read_deck(env.clone(), fee_payer.clone());
+pub fn remove_place(env: Env, user: Address, token_id: TokenId) {
+    let mut deck = read_deck(env.clone(), user.clone());
 
     assert!(deck.token_ids.len() > 0, "Decks are null!");
 
-    let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+    let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
 
     log!(&env, "deck token id length {}", deck.token_ids.len());
 
@@ -192,7 +192,7 @@ pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
     assert!(nft.locked_by_action == Action::Deck, "Not locked by Deck");
     nft.locked_by_action = Action::None;
 
-    write_nft(&env, fee_payer.clone(), token_id.clone(), nft.clone());
+    write_nft(&env, user.clone(), token_id.clone(), nft.clone());
 
     let mut balance = read_balance(&env);
     balance.total_deck_power -= deck.total_power.clone();
@@ -201,11 +201,11 @@ pub fn remove_place(env: Env, fee_payer: Address, token_id: TokenId) {
     deck.bonus = 0;
     deck.deck_categories = 0;
 
-    write_deck(env.clone(), fee_payer.clone(), deck);
+    write_deck(env.clone(), user.clone(), deck);
     update_haw_ai_percentages(env.clone());
 
     let config = read_config(&env);
-    mint_terry(&env, fee_payer.clone(), config.terry_per_deck);
+    mint_terry(&env, user.clone(), config.terry_per_deck);
 
     balance.haw_ai_terry += config.terry_per_deck * config.haw_ai_percentage as i128 / 100;
     write_balance(&env, &balance);
@@ -246,17 +246,17 @@ pub fn calculate_deck_balance(env: Env, player_address: Address, deck: &mut Deck
         update_haw_ai_percentages(env.clone());
     }
 }
-// pub fn remove_all_place(env: Env, fee_payer: Address) {
-//     let deck = read_deck(env.clone(), fee_payer.clone());
+// pub fn remove_all_place(env: Env, user: Address) {
+//     let deck = read_deck(env.clone(), user.clone());
 
 //     // release all action, write nft
 //     for i in 0..4 {
 //         let token_id = deck.token_ids.get(i).unwrap();
 
-//         let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+//         let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
 //         nft.locked_by_action = Action::None;
 
-//         write_nft(&env.clone(), fee_payer.clone(), token_id.clone(), nft);
+//         write_nft(&env.clone(), user.clone(), token_id.clone(), nft);
 //     }
 
 //     // update balance
@@ -265,7 +265,7 @@ pub fn calculate_deck_balance(env: Env, player_address: Address, deck: &mut Deck
 //     write_balance(&env, &balance);
 
 //     // remove deck
-//     remove_deck(env.clone(), fee_payer.clone());
+//     remove_deck(env.clone(), user.clone());
 
 //     // update haw ai percentage
 //

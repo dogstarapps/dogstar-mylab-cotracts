@@ -6,9 +6,9 @@ use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
 use user_info::{read_owner_card, read_user, write_owner_card};
 
-pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
-    //fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer.clone()).owner;
+pub fn burn(env: Env, user: Address, token_id: TokenId) {
+    //user.require_auth();
+    let owner = read_user(&env, user.clone()).owner;
 
     let config = read_config(&env);
     let nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
@@ -20,7 +20,7 @@ pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
     let pot_power = nft.power * (100 - config.burn_receive_percentage) / 100; // Power to pot
 
     // Mint owner's share
-    mint_terry(&env, fee_payer.clone(), receive_amount);
+    mint_terry(&env, user.clone(), receive_amount);
 
     // Accumulate to pot with Dogstar fee deduction
     NFT::accumulate_pot(env.clone(), pot_terry, pot_power, 0);

@@ -20,7 +20,7 @@ use crate::pot::reward::*;
 use crate::storage_types::*;
 use crate::user_info::{
     add_card_to_owner, burn_terry, get_user_level, mint_terry, read_owner_card, read_user,
-    write_user, User,
+    write_user,
 };
 
 use soroban_sdk::{
@@ -152,15 +152,15 @@ impl NFT {
 
     pub fn mint(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         token_id: TokenId,
         card_level: u32,
         buy_currency: Currency,
     ) {
-        fee_payer.require_auth();
+        user.require_auth();
 
-        let user: User = read_user(&env, fee_payer.clone());
-        let to: Address = user.owner;
+        let user: User = read_user(&env, user.clone());
+        let to: Address = user.owner.clone();
         let user_level = get_user_level(&env, to.clone());
 
         assert!(
@@ -202,7 +202,7 @@ impl NFT {
             let amount = card_metadata.price_terry;
             let withdrawable_amount = (config.withdrawable_percentage as i128 * amount) / 100;
             let haw_ai_amount = amount - withdrawable_amount;
-            burn_terry(&env, fee_payer.clone(), amount);
+            burn_terry(&env, user.owner.clone(), amount);
             balance.admin_terry += withdrawable_amount;
             Self::accumulate_pot(env.clone(), haw_ai_amount, 0, 0);
         } else {
@@ -225,8 +225,8 @@ impl NFT {
         write_nft(&env, to, token_id, nft);
     }
 
-    pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
-        burn::burn(env, fee_payer, token_id)
+    pub fn burn(env: Env, user: Address, token_id: TokenId) {
+        burn::burn(env, user, token_id)
     }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
@@ -535,35 +535,35 @@ impl NFT {
 impl NFT {
     pub fn stake(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
         period_index: u32,
     ) {
-        stake::stake(env, fee_payer, category, token_id, period_index)
+        stake::stake(env, user, category, token_id, period_index)
     }
 
     pub fn increase_stake_power(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
         increase_power: u32,
     ) {
-        stake::increase_stake_power(env, fee_payer, category, token_id, increase_power)
+        stake::increase_stake_power(env, user, category, token_id, increase_power)
     }
 
-    pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-        stake::unstake(env, fee_payer, category, token_id)
+    pub fn unstake(env: Env, user: Address, category: Category, token_id: TokenId) {
+        stake::unstake(env, user, category, token_id)
     }
 
     pub fn read_stake(
         env: &Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
     ) -> stake::Stake {
-        stake::read_stake(env, fee_payer, category, token_id)
+        stake::read_stake(env, user, category, token_id)
     }
 
     pub fn read_stakes(env: Env) -> Vec<stake::Stake> {
@@ -605,19 +605,19 @@ impl NFT {
 
     pub fn read_fight(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
     ) -> fight::Fight {
-        fight::read_fight(env, fee_payer, category, token_id)
+        fight::read_fight(env, user, category, token_id)
     }
 
     pub fn read_fights(env: Env) -> Vec<fight::Fight> {
         fight::read_fights(env)
     }
 
-    pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-        fight::check_liquidation(env, fee_payer, category, token_id)
+    pub fn check_liquidation(env: Env, user: Address, category: Category, token_id: TokenId) {
+        fight::check_liquidation(env, user, category, token_id)
     }
 }
 

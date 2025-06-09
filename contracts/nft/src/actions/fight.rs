@@ -51,15 +51,9 @@ pub struct Fight {
     pub amount_asset: i128,
 }
 
-pub fn write_fight(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-    fight: Fight,
-) {
-    // fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn write_fight(env: Env, user: Address, category: Category, token_id: TokenId, fight: Fight) {
+    // user.require_auth();
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &fight);
@@ -89,8 +83,8 @@ pub fn write_fight(
     )
 }
 
-pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_fight(env: Env, user: Address, category: Category, token_id: TokenId) -> Fight {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -99,8 +93,8 @@ pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: To
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn remove_fight(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user).owner;
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
 
@@ -169,10 +163,10 @@ pub fn get_liquidation_price(fight: &Fight) -> i128 {
     }
 }
 
-pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+pub fn check_liquidation(env: Env, user: Address, category: Category, token_id: TokenId) {
     let fight = read_fight(
         env.clone(),
-        fee_payer.clone(),
+        user.clone(),
         category.clone(),
         token_id.clone(),
     );
@@ -188,17 +182,17 @@ pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token
         SidePosition::Short => current_price >= liq_price,
     };
     if is_liquidated {
-        let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+        let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
         nft.power = 0;
-        remove_owner_card(&env, fee_payer.clone(), token_id.clone());
-        remove_nft(&env, fee_payer.clone(), token_id.clone());
-        remove_fight(env, fee_payer, category, token_id);
+        remove_owner_card(&env, user.clone(), token_id.clone());
+        remove_nft(&env, user.clone(), token_id.clone());
+        remove_fight(env, user, category, token_id);
     }
 }
 
 pub fn open_position(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     currency: FightCurrency,
@@ -206,8 +200,8 @@ pub fn open_position(
     leverage: u32,
     power_staked: u32,
 ) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert_eq!(nft.locked_by_action, Action::None, "Card is locked");
     let config = read_config(&env);
@@ -272,9 +266,9 @@ pub fn open_position(
     write_balance(&env, &balance);
 }
 
-pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer.clone()).owner;
+pub fn close_position(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let owner = read_user(&env, user.clone()).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     let fight = read_fight(
         env.clone(),
@@ -317,8 +311,8 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
 
     // Forfeit card if POWER is 0
     if nft.power == 0 {
-        remove_owner_card(&env, fee_payer.clone(), token_id.clone());
-        remove_nft(&env, fee_payer.clone(), token_id.clone());
+        remove_owner_card(&env, user.clone(), token_id.clone());
+        remove_nft(&env, user.clone(), token_id.clone());
     } else {
         nft.locked_by_action = Action::None;
         write_nft(&env, owner.clone(), token_id.clone(), nft);

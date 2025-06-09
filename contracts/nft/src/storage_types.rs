@@ -13,6 +13,16 @@ pub(crate) const BALANCE_LIFETIME_THRESHOLD: u32 = BALANCE_BUMP_AMOUNT - DAY_IN_
 pub struct TokenId(pub u32);
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct User {
+    pub owner: Address,
+    pub power: u32,
+    pub terry: i128,
+    pub total_history_terry: i128,
+    pub level: u32,
+}
+
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct Level {
     pub minimum_terry: i128,
