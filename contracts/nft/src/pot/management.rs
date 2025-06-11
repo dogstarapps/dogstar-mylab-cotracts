@@ -135,6 +135,33 @@ pub fn get_eligible_players(env: &Env) -> Vec<Address> {
     eligible_players
 }
 
+
+pub fn get_eligible_players_with_shares(env: &Env, round: u32) -> Vec<(Address, u32)> {
+    let players = get_eligible_players(env);
+    let mut total_effective_power: u32 = 0;
+    let mut player_powers = Vec::new(env);
+
+    for player in players.iter() {
+        let deck = read_deck(env.clone(), player.clone());
+        if deck.token_ids.len() == 4 {
+            let effective_power = calculate_effective_power(deck.total_power, deck.bonus);
+            total_effective_power += effective_power;
+            player_powers.push_back((player, effective_power));
+        }
+    }
+
+    let mut result = Vec::new(env);
+    for (player, effective_power) in player_powers.iter() {
+        let share_percentage = if total_effective_power > 0 {
+            (effective_power * 10000) / total_effective_power // Basis points
+        } else {
+            0
+        };
+        result.push_back((player, share_percentage));
+    }
+    result
+}
+
 pub fn calculate_player_shares(env: &Env, round: u32) {
     let players = get_eligible_players(env);
     let mut total_effective_power: u32 = 0;
