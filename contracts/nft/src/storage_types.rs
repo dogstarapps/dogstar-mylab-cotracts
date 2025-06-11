@@ -77,7 +77,7 @@ pub struct PendingReward {
 #[contracttype]
 pub enum RewardStatus {
     Pending,
-    AwaitingTrustline,
+    AwaitingTrustLine,
     Claimed,
     Failed,
 }
