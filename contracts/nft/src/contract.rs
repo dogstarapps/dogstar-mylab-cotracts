@@ -533,8 +533,8 @@ impl NFT {
         get_eligible_players(&env)
     }
 
-    pub fn get_eligible_players_with_shares(env: Env) -> Vec<(Address, u32)> {
-        get_eligible_players_with_shares(&env)
+    pub fn get_eligible_players_with_shares(env: Env,round: u32) -> Vec<(Address, u32)> {
+        get_eligible_players_with_shares(&env,round)
     }
 }
 
