@@ -528,6 +528,14 @@ impl NFT {
         );
         Self::accumulate_pot(env, terry, power, xtar);
     }
+
+    pub fn get_eligible_players(env: Env) -> Vec<Address> {
+        get_eligible_players(&env)
+    }
+
+    pub fn get_eligible_players_with_shares(env: Env) -> Vec<(Address, u32)> {
+        get_eligible_players_with_shares(&env)
+    }
 }
 
 // Stake, Fight, Lend & Borrow, Deck sections unchanged

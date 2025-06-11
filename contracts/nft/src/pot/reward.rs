@@ -46,8 +46,8 @@ pub fn process_reward(e: &Env, player: &Address, reward: &PendingReward) -> Rewa
     //         xtar_token.transfer(&e.current_contract_address(), player, &reward.xtar_amount);
     //         updated = true;
     //     } else {
-    //         final_status = RewardStatus::AwaitingTrustline;
-    //         // Emit RewardPending instead of trustline_required
+    //         final_status = RewardStatus::AwaitingTrustLine;
+    //         // Emit RewardPending instead of trustLine_required
     //         emit_reward_pending(e, player, reward);
     //     }
     // }

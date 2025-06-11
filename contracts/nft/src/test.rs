@@ -1001,7 +1001,7 @@ fn test_invalid_deck_exclusion() {
 //     let pending_reward = pending.get(0).unwrap();
 //     assert_eq!(pending_reward.round_number, 1);
 //     assert_eq!(pending_reward.xtar_amount, 1900);
-//     assert_eq!(pending_reward.status, RewardStatus::AwaitingTrustline);
+//     assert_eq!(pending_reward.status, RewardStatus::AwaitingTrustLine);
 
 //     // Verify events
 //     let events = e.events().all();
