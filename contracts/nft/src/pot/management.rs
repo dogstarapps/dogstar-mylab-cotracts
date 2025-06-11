@@ -136,7 +136,7 @@ pub fn get_eligible_players(env: &Env) -> Vec<Address> {
 }
 
 
-pub fn get_eligible_players_with_shares(env: &Env, round: u32) -> Vec<(Address, u32)> {
+pub fn get_eligible_players_with_shares(env: &Env) -> Vec<(Address, u32)> {
     let players = get_eligible_players(env);
     let mut total_effective_power: u32 = 0;
     let mut player_powers = Vec::new(env);
