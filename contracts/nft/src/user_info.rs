@@ -40,13 +40,11 @@ pub fn read_user(e: &Env, user: Address) -> User {
 }
 
 pub fn write_user(e: &Env, user: Address, user_info: User) {
-    user.require_auth();
     let key = DataKey::User(user);
     e.storage().persistent().set(&key, &user_info);
 }
 
 pub fn get_user_level(e: &Env, user: Address) -> u32 {
-    user.require_auth();
     let user = read_user(&e, user.clone());
     let balance = user.total_history_terry;
     log!(&e, "get_user_level >> User balance {}", balance);
