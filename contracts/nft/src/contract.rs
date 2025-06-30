@@ -536,6 +536,10 @@ impl NFT {
     pub fn get_eligible_players_with_shares(env: Env) -> Vec<(Address, u32)> {
         get_eligible_players_with_shares(&env)
     }
+
+    pub fn get_all_rounds(env: Env) -> Vec<u32> {
+        get_all_rounds(&env)
+    }
 }
 
 // Stake, Fight, Lend & Borrow, Deck sections unchanged
