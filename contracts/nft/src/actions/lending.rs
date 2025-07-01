@@ -150,7 +150,7 @@ pub fn write_borrowing(
 }
 
 pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) -> Borrowing {
-    user.require_auth();
+    // user.require_auth();
     let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
