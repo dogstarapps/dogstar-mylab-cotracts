@@ -1,7 +1,7 @@
 use crate::contract::NFT;
 use crate::{user_info::mint_terry, *};
 use admin::read_config;
-use nft_info::{read_nft, remove_nft};
+use nft_info::{read_nft, remove_nft, Action};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
 use user_info::{read_owner_card, read_user, write_owner_card};
@@ -23,7 +23,7 @@ pub fn burn(env: Env, user: Address, token_id: TokenId) {
     mint_terry(&env, user.clone(), receive_amount);
 
     // Accumulate to pot with Dogstar fee deduction
-    NFT::accumulate_pot(env.clone(), pot_terry, pot_power, 0);
+    NFT::accumulate_pot(env.clone(), pot_terry, pot_power, 0, owner.clone(), Action::Burn);
 
     // Remove card and NFT
     remove_owner_card(&env, owner.clone(), token_id.clone());

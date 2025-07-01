@@ -204,7 +204,7 @@ impl NFT {
             let haw_ai_amount = amount - withdrawable_amount;
             burn_terry(&env, user.owner.clone(), amount);
             balance.admin_terry += withdrawable_amount;
-            Self::accumulate_pot(env.clone(), haw_ai_amount, 0, 0);
+            Self::accumulate_pot(env.clone(), haw_ai_amount, 0, 0, user.owner.clone(), Action::Mint);
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount =
@@ -213,7 +213,7 @@ impl NFT {
             token.burn(&to.clone(), &burnable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.haw_ai_xtar += haw_ai_amount;
-            Self::accumulate_pot(env.clone(), 0, 0, haw_ai_amount);
+            Self::accumulate_pot(env.clone(), 0, 0, haw_ai_amount, user.owner.clone(), Action::Mint);
         };
         write_balance(&env, &balance);
     }
@@ -414,7 +414,7 @@ impl NFT {
         pending
     }
 
-    pub fn accumulate_pot(env: Env, terry: i128, power: u32, xtar: i128) {
+    pub fn accumulate_pot(env: Env, terry: i128, power: u32, xtar: i128, from: Option<Address>, action: Option<Action>) {
         // let admin = read_administrator(&env);
         // admin.require_auth(); // commented out for testing
         let config = read_config(&env);
@@ -434,7 +434,7 @@ impl NFT {
         write_pot_balance(&env, &pot_balance);
         write_dogstar_balance(&env, &dogstar_balance);
         if terry_fee > 0 || power_fee > 0 || xtar_fee > 0 {
-            emit_dogstar_fee_accumulated(&env, terry_fee, power_fee, xtar_fee, fee_percentage);
+            emit_dogstar_fee_accumulated(&env, terry_fee, power_fee, xtar_fee, fee_percentage, from, action);
         }
     }
 

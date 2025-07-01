@@ -28,6 +28,7 @@ pub enum Action {
     Borrow,
     Burn,
     Deck,
+    Mint,
 }
 
 #[contracttype]
