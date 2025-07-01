@@ -220,20 +220,20 @@ pub fn open_position(
     let position_size = margin_usdc * leverage as i128;
 
     // Get currency price from oracle (1)
-    // let mut trigger_price = 0;
+    let mut trigger_price = 0;
 
-    // #[cfg(not(test))]
-    // {
-    //     trigger_price =
-    //         get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
-    // }
+    #[cfg(not(test))]
+    {
+        trigger_price =
+            get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
+    }
     // #[cfg(test)]
     // {
     //     trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
 
     // Get currency price from oracle (2)
 
-    let trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
+    // let trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
 
     assert!(trigger_price > 0, "Invalid oracle price");
 
