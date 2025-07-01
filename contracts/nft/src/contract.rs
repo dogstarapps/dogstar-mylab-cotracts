@@ -24,7 +24,7 @@ use crate::user_info::{
 };
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, panic_with_error, token, Address, BytesN, Env, Symbol,
+    contract, contractimpl, contracttype, panic_with_error, token, Address, BytesN, Env, Symbol,log
 };
 use soroban_sdk::{vec, String, Vec};
 use soroban_token_sdk::TokenUtils;
@@ -670,6 +670,7 @@ impl NFT {
         category: Category,
         token_id: TokenId,
     ) -> lending::Borrowing {
+        player.require_auth()
         lending::read_borrowing(env, player, category, token_id)
     }
 
