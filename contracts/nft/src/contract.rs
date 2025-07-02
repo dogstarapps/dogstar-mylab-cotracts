@@ -204,7 +204,7 @@ impl NFT {
             let haw_ai_amount = amount - withdrawable_amount;
             burn_terry(&env, user.owner.clone(), amount);
             balance.admin_terry += withdrawable_amount;
-            Self::accumulate_pot(env.clone(), haw_ai_amount, 0, 0, user.owner.clone(), Action::Mint);
+            Self::accumulate_pot(env.clone(), haw_ai_amount, 0, 0, Some(user.owner.clone()), Some(Action::Mint));
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount =
@@ -213,7 +213,7 @@ impl NFT {
             token.burn(&to.clone(), &burnable_amount);
             token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
             balance.haw_ai_xtar += haw_ai_amount;
-            Self::accumulate_pot(env.clone(), 0, 0, haw_ai_amount, user.owner.clone(), Action::Mint);
+            Self::accumulate_pot(env.clone(), 0, 0, haw_ai_amount, Some(user.owner.clone()), Some(Action::Mint));
         };
         write_balance(&env, &balance);
     }
@@ -526,7 +526,7 @@ impl NFT {
             terry >= 0 && xtar >= 0,
             "Negative contributions not allowed"
         );
-        Self::accumulate_pot(env, terry, power, xtar);
+        Self::accumulate_pot(env, terry, power, xtar, None, None);
     }
 
     pub fn get_eligible_players(env: Env) -> Vec<Address> {
@@ -670,7 +670,7 @@ impl NFT {
         category: Category,
         token_id: TokenId,
     ) -> lending::Borrowing {
-        player.require_auth()
+        player.require_auth();
         lending::read_borrowing(env, player, category, token_id)
     }
 

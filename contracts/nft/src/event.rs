@@ -1,5 +1,6 @@
 use crate::storage_types::{PendingReward, PlayerReward, PotSnapshot};
-use soroban_sdk::{Address, Env};
+use crate::nft_info::{Action};
+use soroban_sdk::{Address, Env, BytesN, String};
 
 // Event Emission
 /// Emits an event when the pot is opened.
@@ -37,10 +38,23 @@ pub fn emit_dogstar_fee_accumulated(
     power: u32,
     xtar: i128,
     fee_percentage: u32,
+    from: Option<Address>,
+    action: Option<Action>
 ) {
+    let action_val = action.unwrap_or(Action::None);
+    
+    // let demo_account_strkey = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+    
+    // Convert &str to soroban_sdk::String
+    // let demo_address_string = String::from_str(&env, demo_account_strkey); 
+    
+    // Use the soroban_sdk::String to create the Address
+    // let demo_address = Address::from_string(&demo_address_string);
+    // let from_val = from.unwrap_or(Address::from_string(String::from(&"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF")));
+    
     env.events().publish(
         ("dogstar_fee_accumulated",),
-        (terry, power, xtar, fee_percentage),
+        (terry, power, xtar, fee_percentage, from, action_val),
     );
 }
 
