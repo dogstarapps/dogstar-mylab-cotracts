@@ -1,7 +1,7 @@
 use crate::{nft_info::remove_nft, user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec, log};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
@@ -203,6 +203,7 @@ pub fn open_position(
     user.require_auth();
     let owner = read_user(&env, user).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    log!(&env, "fight >> nft to fight = ", nft);
     assert_eq!(nft.locked_by_action, Action::None, "Card is locked");
     let config = read_config(&env);
 
@@ -227,6 +228,7 @@ pub fn open_position(
         trigger_price =
             get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
     }
+    log!(&env, "fight >> trigger_price = ", trigger_price);
     // #[cfg(test)]
     // {
     //     trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
