@@ -163,15 +163,15 @@ pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: Tok
 pub fn remove_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) {
     let owner = read_user(&env, user.clone()).owner;
 
-    let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
-    env.storage().persistent().remove(&key);
-    if env.storage().persistent().has(&key) {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    }
+    // let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
+    // env.storage().persistent().remove(&key);
+    // if env.storage().persistent().has(&key) {
+    //     env.storage().persistent().extend_ttl(
+    //         &key,
+    //         BALANCE_LIFETIME_THRESHOLD,
+    //         BALANCE_BUMP_AMOUNT,
+    //     );
+    // }
 
     let key = DataKey::Borrowings;
     let mut borrowings = read_borrowings(env.clone());
@@ -198,6 +198,9 @@ pub fn remove_borrowing(env: Env, user: Address, category: Category, token_id: T
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
+    let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
+    env.storage().persistent().remove(&key);
 }
 
 pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
