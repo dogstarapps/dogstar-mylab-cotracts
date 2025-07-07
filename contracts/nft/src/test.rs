@@ -1,5 +1,4 @@
 #![cfg(test)]
-extern crate std;
 
 use crate::nft_info::Card;
 use crate::storage_types::*;

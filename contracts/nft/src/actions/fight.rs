@@ -1,7 +1,7 @@
 use crate::{nft_info::remove_nft, user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec, log};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
@@ -95,9 +95,7 @@ pub fn read_fight(env: Env, user: Address, category: Category, token_id: TokenId
 
 pub fn remove_fight(env: Env, user: Address, category: Category, token_id: TokenId) {
     let owner = read_user(&env, user).owner;
-    let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
-    env.storage().persistent().remove(&key);
-
+    
     let key = DataKey::Fights;
     let mut fights = read_fights(env.clone());
     if let Some(pos) = fights.iter().position(|fight| {
@@ -121,6 +119,11 @@ pub fn remove_fight(env: Env, user: Address, category: Category, token_id: Token
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
+    log!(&env, "remove_fight >> ", owner.clone());
+    let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
+    log!(&env, "remove_fight >> ", "key = ", key);
+    env.storage().persistent().remove(&key);
 }
 
 pub fn read_fights(env: Env) -> Vec<Fight> {
@@ -203,6 +206,7 @@ pub fn open_position(
     user.require_auth();
     let owner = read_user(&env, user).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    log!(&env, "fight >> nft to fight = ", nft);
     assert_eq!(nft.locked_by_action, Action::None, "Card is locked");
     let config = read_config(&env);
 
@@ -227,6 +231,7 @@ pub fn open_position(
         trigger_price =
             get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
     }
+    log!(&env, "fight >> trigger_price = ", trigger_price);
     // #[cfg(test)]
     // {
     //     trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
@@ -270,21 +275,23 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     user.require_auth();
     let owner = read_user(&env, user.clone()).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    log!(&env, "read nft = ", nft.clone());
     let fight = read_fight(
         env.clone(),
         owner.clone(),
         category.clone(),
         token_id.clone(),
     );
+    log!(&env, "read fight = ", fight.clone());
     let config = read_config(&env);
     let mut balance = read_balance(&env);
 
     // Deduct fee
-    let power_fee = config.power_action_fee * fight.power / 100;
-    assert!(nft.power >= power_fee, "Insufficient POWER for fee");
-    nft.power -= power_fee;
-    balance.haw_ai_power += power_fee;
-
+    // let power_fee = config.power_action_fee * fight.power / 100;
+    // assert!(nft.power >= power_fee, "Insufficient POWER for fee");
+    // nft.power -= power_fee;
+    // balance.haw_ai_power += power_fee;
+    // log!(&env, "calculated power fee = ", power_fee.clone());
     // Calculate PnL
     let power_to_usdc_rate = config.power_to_usdc_rate;
     let margin_usdc = (fight.power as i128) * power_to_usdc_rate / 10000;
@@ -298,11 +305,12 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     {
         current_price = 86000; // Mock price for tests (86,000 USDC)
     }
+    log!(&env, "current asset price", current_price.clone());
     assert!(current_price > 0, "Invalid oracle price");
     assert!(fight.trigger_price > 0, "Invalid trigger price");
     let pnl_usdc = position_size * (current_price - fight.trigger_price) / fight.trigger_price;
     let pnl_power = pnl_usdc * 10000 / power_to_usdc_rate;
-
+    log!(&env, "pnl = ", pnl_usdc, pnl_power);
     // Update POWER with cap
     let card_metadata = crate::metadata::read_metadata(&env, token_id.0);
     nft.power = (nft.power as i128 + pnl_power)
@@ -317,7 +325,7 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
         nft.locked_by_action = Action::None;
         write_nft(&env, owner.clone(), token_id.clone(), nft);
     }
-
+    log!(&env, "remove fight", fight.token_id.clone());
     // Remove fight
     remove_fight(env.clone(), owner.clone(), category.clone(), token_id);
 
