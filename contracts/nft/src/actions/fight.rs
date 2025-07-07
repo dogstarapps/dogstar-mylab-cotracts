@@ -287,11 +287,11 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     let mut balance = read_balance(&env);
 
     // Deduct fee
-    let power_fee = config.power_action_fee * fight.power / 100;
-    assert!(nft.power >= power_fee, "Insufficient POWER for fee");
-    nft.power -= power_fee;
-    balance.haw_ai_power += power_fee;
-    log!(&env, "calculated power fee = ", power_fee.clone());
+    // let power_fee = config.power_action_fee * fight.power / 100;
+    // assert!(nft.power >= power_fee, "Insufficient POWER for fee");
+    // nft.power -= power_fee;
+    // balance.haw_ai_power += power_fee;
+    // log!(&env, "calculated power fee = ", power_fee.clone());
     // Calculate PnL
     let power_to_usdc_rate = config.power_to_usdc_rate;
     let margin_usdc = (fight.power as i128) * power_to_usdc_rate / 10000;
