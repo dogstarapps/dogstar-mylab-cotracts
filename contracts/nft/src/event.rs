@@ -1,12 +1,12 @@
 use crate::storage_types::{PendingReward, PlayerReward, PotSnapshot};
 use crate::nft_info::{Action};
-use soroban_sdk::{Address, Env, BytesN, String};
+use soroban_sdk::{Address, Env, BytesN, String, symbole_short};
 
 // Event Emission
 /// Emits an event when the pot is opened.
 pub fn emit_pot_opened(env: &Env, round: u32, snapshot: &PotSnapshot) {
     env.events().publish(
-        ("pot_opened", round),
+        (symbole_short!("pot_opened"), round),
         (
             snapshot.total_terry,
             snapshot.total_power,
@@ -20,7 +20,7 @@ pub fn emit_pot_opened(env: &Env, round: u32, snapshot: &PotSnapshot) {
 /// Emits an event when a player's share is calculated.
 pub fn emit_share_calculated(env: &Env, player: &Address, reward: &PlayerReward) {
     env.events().publish(
-        ("share_calculated", player.clone()),
+        (symbole_short!("share_calculated"), player.clone()),
         (
             reward.round_number,
             reward.share_percentage,
@@ -53,7 +53,7 @@ pub fn emit_dogstar_fee_accumulated(
     // let from_val = from.unwrap_or(Address::from_string(String::from(&"GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF")));
     
     env.events().publish(
-        ("dogstar_fee_accumulated",),
+        (symbole_short!("dogstar_fee_accumulated"),),
         (terry, power, xtar, fee_percentage, from, action_val),
     );
 }
@@ -67,7 +67,7 @@ pub fn emit_dogstar_fee_withdrawn(
     xtar: i128,
 ) {
     env.events().publish(
-        ("dogstar_fee_withdrawn", recipient.clone()),
+        (symbole_short!("dogstar_fee_withdrawn"), recipient.clone()),
         (terry, power, xtar),
     );
 }
@@ -75,13 +75,13 @@ pub fn emit_dogstar_fee_withdrawn(
 /// Emits an event when the Dogstar fee percentage is updated.
 pub fn emit_dogstar_fee_percentage_updated(env: &Env, old_fee: u32, new_fee: u32) {
     env.events()
-        .publish(("dogstar_fee_percentage_updated",), (old_fee, new_fee));
+        .publish((symbole_short!("dogstar_fee_percentage_updated"),), (old_fee, new_fee));
 }
 
 /// Emits an event when a reward is claimed.
 pub fn emit_reward_claimed(e: &Env, player: &Address, reward: &PendingReward) {
     e.events().publish(
-        ("reward_claimed", player.clone(), reward.round_number),
+        (symbole_short!("reward_claimed"), player.clone(), reward.round_number),
         (reward.terry_amount, reward.power_amount, reward.xtar_amount),
     );
 }
@@ -89,7 +89,7 @@ pub fn emit_reward_claimed(e: &Env, player: &Address, reward: &PendingReward) {
 /// Emits an event when a reward is marked as pending due to missing trustline.
 pub fn emit_reward_pending(e: &Env, player: &Address, reward: &PendingReward) {
     e.events().publish(
-        ("reward_pending", player.clone(), reward.round_number),
+        (symbole_short!("reward_pending"), player.clone(), reward.round_number),
         (reward.terry_amount, reward.power_amount, reward.xtar_amount),
     );
 }
