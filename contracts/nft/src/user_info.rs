@@ -111,10 +111,7 @@ pub fn mint_terry(e: &Env, owner: Address, amount: i128) {
 
 pub fn burn_terry(e: &Env, owner: Address, amount: i128) {
     let mut user = read_user(e, owner.clone());
-    if user.terry < amount {
-        log!(&e, "burn_terry >> Not enough terry to burn");
-        return;
-    }
+    assert!(user.terry >= amount, "Not enough terry to burn");
     user.terry -= amount;
     write_user(e, user.owner.clone(), user);
     log!(&e, "burn_terry >> Burned terry {}", amount);

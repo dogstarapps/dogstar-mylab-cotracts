@@ -200,6 +200,7 @@ impl NFT {
 
         if buy_currency == Currency::Terry {
             let amount = card_metadata.price_terry;
+            assert!(user.terry >= amount, "Not enough terry to burn");
             let withdrawable_amount = (config.withdrawable_percentage as i128 * amount) / 100;
             let haw_ai_amount = amount - withdrawable_amount;
             burn_terry(&env, user.owner.clone(), amount);
