@@ -7,7 +7,7 @@ use storage_types::TokenId;
 use user_info::{read_owner_card, read_user, write_owner_card};
 
 pub fn burn(env: Env, user: Address, token_id: TokenId) {
-    //user.require_auth();
+    user.require_auth();
     let owner = read_user(&env, user.clone()).owner;
 
     let config = read_config(&env);
