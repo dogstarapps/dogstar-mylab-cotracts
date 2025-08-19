@@ -246,6 +246,18 @@ impl NFT {
         TokenUtils::new(&e).events().set_admin(admin, new_admin);
     }
 
+    pub fn check_admin(e: Env) -> bool {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+        true
+    }
+
+    pub fn check_admin_address(e: Env) -> Address {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+        admin
+    }
+
     pub fn add_level(e: &Env, level: Level) -> u32 {
         add_level(e, level)
     }
