@@ -16,4 +16,5 @@ pub enum MyLabError {
 pub enum NFTError {
     AlreadyInitialized = 1,
     RoundAlreadyProcessed = 2,
+    NotAuthorized = 3,
 }

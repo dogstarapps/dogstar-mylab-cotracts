@@ -48,7 +48,7 @@ pub struct CardInfo {
 }
 
 impl CardInfo {
-    pub fn get_default_card(category: Category) -> Self {
+    pub fn get_default_card(_category: Category) -> Self {
         Self {
             initial_power: 1000,
             max_power: 10000,
