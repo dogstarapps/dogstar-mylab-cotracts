@@ -179,7 +179,7 @@ impl NFT {
         };
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
 
-        add_card_to_owner(&env, token_id.clone(), to.clone()).unwrap();
+        add_card_to_owner(&env, token_id.clone(), to.clone()).map_err(|e| { NFTError::NotAuthorized });
 
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
@@ -416,8 +416,8 @@ impl NFT {
     }
 
     pub fn accumulate_pot(env: Env, terry: i128, power: u32, xtar: i128, from: Option<Address>, action: Option<Action>) {
-        // let admin = read_administrator(&env);
-        // admin.require_auth(); // commented out for testing
+        let admin = read_administrator(&env);
+        admin.require_auth(); // commented out for testing
         let config = read_config(&env);
         let mut pot_balance = read_pot_balance(&env);
         let mut dogstar_balance = read_dogstar_balance(&env);
@@ -442,7 +442,7 @@ impl NFT {
     pub fn withdraw_dogstar_fees(env: Env) {
         let config = read_config(&env);
         let dogstar_address = config.dogstar_address.clone();
-        // dogstar_address.require_auth();
+        dogstar_address.require_auth();
         let mut balance = read_dogstar_balance(&env);
         let terry = balance.terry;
         let power = balance.power;

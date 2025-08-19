@@ -33,6 +33,22 @@ Ensure you have the following installed:
 - Rust: [Install Rust](https://www.rust-lang.org/tools/install)
 - Stellar CLI: [Install Stellar CLI](https://www.stellar.org/developers/tools-and-sdks/cli.html)
 
+Note: Check Rust Version and Install target
+        
+        # Check Rust version
+        rustc --version
+
+        # If Rust 1.85.0 or newer, add the new target
+        rustup target add wasm32v1-none
+
+        # If older Rust version, ensure you have the standard target
+        rustup target add wasm32-unknown-unknown
+        # For Rust 1.85.0+
+        cargo build --target wasm32v1-none --release --package soroban-nft-contract
+
+        # For older Rust versions  
+        cargo build --target wasm32-unknown-unknown --release --package soroban-nft-contract
+
 ## Building the Contracts
 
 To build the contracts, navigate to the project root directory and run:
@@ -73,7 +89,7 @@ Replace `alice` with the actual source account name.
 
 ## Using the Contracts
 
-Once deployed, you can interact with the contracts on the Stellar testnet. Refer to the Stellar documentation for details on how to call contract functions and handle transactions.
+Once deployed, you can interact with the contracts on the Stellar testnet. Refer to the Stellar documentation for details on how to call contract functions and handle transactions. After deploy this smar contract, You must have to initialize Contract.
 
 
 This README file provides a comprehensive guide on building, optimizing, and deploying your Stellar smart contracts.

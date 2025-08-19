@@ -52,7 +52,7 @@ pub struct Fight {
 }
 
 pub fn write_fight(env: Env, user: Address, category: Category, token_id: TokenId, fight: Fight) {
-    // user.require_auth();
+    user.require_auth();
     let owner = read_user(&env, user).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());

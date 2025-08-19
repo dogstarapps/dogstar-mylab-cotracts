@@ -7,3 +7,8 @@ target
 
 # Rust's test output
 **/test_snapshots
+
+/.vscode
+/.cargo
+contracts/nft/src/config.json
+initialize_contract.sh
