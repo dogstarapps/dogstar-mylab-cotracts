@@ -24,11 +24,13 @@ const MIN_XLM_RESERVE: i128 = 500_0000; // 0.5 XLM in stroops
 //     native_token.balance(player) >= MIN_XLM_RESERVE
 // }
 
+
+
 pub fn process_reward(e: &Env, player: &Address, reward: &PendingReward) -> RewardStatus {
     let mut user = read_user(e, player.clone());
-    let config = read_config(e);
+    let _config = read_config(e);
     let mut updated = false;
-    let mut final_status = RewardStatus::Claimed;
+    let final_status = RewardStatus::Claimed;
 
     if reward.terry_amount > MIN_REWARD_AMOUNT {
         user.terry += reward.terry_amount;

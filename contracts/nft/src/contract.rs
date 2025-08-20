@@ -24,8 +24,7 @@ use crate::user_info::{
 };
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, panic_with_error, token, Address, BytesN, Env, Symbol,log
-};
+    contract, contractimpl, token, Address, BytesN, Env, Symbol};
 use soroban_sdk::{vec, String, Vec};
 use soroban_token_sdk::TokenUtils;
 
@@ -179,7 +178,8 @@ impl NFT {
         };
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
 
-        add_card_to_owner(&env, token_id.clone(), to.clone()).map_err(|e| { NFTError::NotAuthorized });
+        add_card_to_owner(&env, token_id.clone(), to.clone()).map_err(|_e| NFTError::NotAuthorized).unwrap();
+
 
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
