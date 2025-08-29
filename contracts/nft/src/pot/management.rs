@@ -3,6 +3,9 @@ use crate::event::*;
 use crate::storage_types::{
     DataKey, Deck, DogstarBalance, PendingReward, PlayerReward, PotBalance, PotSnapshot,
 };
+use crate::admin::{read_config};
+use crate::storage_types::UserClaimableBalance;
+use crate::nft_info::Action;
 use soroban_sdk::{Address, Env, Vec};
 
 const DAY_IN_LEDGERS: u32 = 17280;
@@ -50,6 +53,37 @@ pub fn write_dogstar_balance(env: &Env, balance: &DogstarBalance) {
     env.storage()
         .persistent()
         .set(&DataKey::DogstarBalance, balance);
+}
+
+// Internal helper to accumulate pot balances and dogstar fees without requiring admin auth.
+// This is intended to be called from trusted internal flows like mint/burn.
+pub fn accumulate_pot_internal(env: &Env, terry: i128, power: u32, xtar: i128, from: Option<Address>, action: Option<Action>) {
+    let config = read_config(env);
+    let mut pot_balance = read_pot_balance(env);
+
+    // Calculate fees in basis points
+    let fee_percentage = config.dogstar_fee_percentage;
+    let terry_fee = (terry * fee_percentage as i128) / 10000;
+    let power_fee = (power * fee_percentage) / 10000;
+    let xtar_fee = (xtar * fee_percentage as i128) / 10000;
+
+    // Accumulate in pot balance (minus dogstar fees)
+    pot_balance.accumulated_terry += terry - terry_fee;
+    pot_balance.accumulated_power += power - power_fee;
+    pot_balance.accumulated_xtar += xtar - xtar_fee;
+    pot_balance.last_updated = env.ledger().timestamp();
+    write_pot_balance(env, &pot_balance);
+
+    // Update legacy dogstar balance for backward-compat events/UI
+    let mut dogstar_balance = read_dogstar_balance(env);
+    dogstar_balance.terry += terry_fee;
+    dogstar_balance.power += power_fee;
+    dogstar_balance.xtar += xtar_fee;
+    write_dogstar_balance(env, &dogstar_balance);
+
+    if terry_fee > 0 || power_fee > 0 || xtar_fee > 0 {
+        emit_dogstar_fee_accumulated(env, terry_fee, power_fee, xtar_fee, fee_percentage, from, action);
+    }
 }
 
 // Snapshot Management

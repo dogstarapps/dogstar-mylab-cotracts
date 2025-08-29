@@ -33,7 +33,6 @@ fn generate_config(e: &Env) -> Config {
     Config {
         xtar_token: Address::generate(e),
         oracle_contract_id: Address::generate(e),
-        haw_ai_pot: Address::generate(e),
         withdrawable_percentage: 50,
         burnable_percentage: 50,
         haw_ai_percentage: 50,
@@ -49,7 +48,6 @@ fn generate_config(e: &Env) -> Config {
         apy_alpha: 10,
         power_to_usdc_rate: 1000,
         dogstar_fee_percentage: 500,
-        dogstar_address: Address::generate(e),
     }
 }
 

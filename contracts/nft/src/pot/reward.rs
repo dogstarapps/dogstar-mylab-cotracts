@@ -80,14 +80,22 @@ pub fn claim_all_pending_rewards(e: Env, player: Address) {
                     status: RewardStatus::Pending,
                 };
 
+                // First, atomically mark the reward as being processed to prevent race conditions
+                let key = DataKey::PlayerShare(round, player.clone());
+                
+                // Check if reward still exists (prevents double-claim)
+                if !e.storage().persistent().has(&key) {
+                    continue; // Already claimed, skip
+                }
+                
+                // Remove reward BEFORE processing to prevent double-spending
+                e.storage().persistent().remove(&key);
+                
                 let status = process_reward(&e, &player, &reward);
                 if status == RewardStatus::Claimed {
                     emit_reward_claimed(&e, &player, &reward);
-                    // Remove reward to prevent double-spending
-                    e.storage()
-                        .persistent()
-                        .remove(&DataKey::PlayerShare(round, player.clone()));
                 } else {
+                    // If processing failed, write as pending (but not back to PlayerShare)
                     let pending_reward = PendingReward { status, ..reward };
                     write_pending_reward(&e, round, &player, &pending_reward);
                     pending_rewards.push_back(pending_reward);

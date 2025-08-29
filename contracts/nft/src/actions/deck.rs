@@ -34,7 +34,7 @@ fn write_deck(env: Env, user: Address, deck: Deck) {
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-fn read_decks(env: Env) -> Vec<Deck> {
+pub fn read_decks(env: Env) -> Vec<Deck> {
     let key = DataKey::Decks;
     env.storage()
         .persistent()
@@ -195,7 +195,11 @@ pub fn remove_place(env: Env, user: Address, token_id: TokenId) {
     write_nft(&env, user.clone(), token_id.clone(), nft.clone());
 
     let mut balance = read_balance(&env);
-    balance.total_deck_power -= deck.total_power.clone();
+    if balance.total_deck_power >= deck.total_power {
+        balance.total_deck_power -= deck.total_power.clone();
+    } else {
+        balance.total_deck_power = 0;
+    }
 
     deck.total_power = 0;
     deck.bonus = 0;
