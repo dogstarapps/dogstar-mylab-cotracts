@@ -93,3 +93,11 @@ pub fn emit_reward_pending(e: &Env, player: &Address, reward: &PendingReward) {
         (reward.terry_amount, reward.power_amount, reward.xtar_amount),
     );
 }
+
+/// Emits an event when rewards are claimed from HAW AI pot.
+pub fn emit_rewards_claimed(e: &Env, player: &Address, terry: i128, power: u32, xtar: i128) {
+    e.events().publish(
+        (symbol_short!("rwd_claim"), player.clone()),
+        (terry, power, xtar),
+    );
+}

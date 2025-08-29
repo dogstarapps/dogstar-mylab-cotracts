@@ -98,3 +98,56 @@ pub fn get_and_increase_level_id(env: &Env) -> u32 {
         .set(&DataKey::LevelId, &(prev + 1));
     prev + 1
 }
+
+// Vault management functions
+pub fn write_contract_vault(e: &Env, vault: &ContractVault) {
+    let key = DataKey::ContractVault;
+    e.storage().persistent().set(&key, vault);
+}
+
+pub fn read_contract_vault(e: &Env) -> ContractVault {
+    let key = DataKey::ContractVault;
+    e.storage().persistent().get(&key).unwrap_or(ContractVault {
+        haw_ai_pot_terry: 0,
+        haw_ai_pot_power: 0,
+        haw_ai_pot_xtar: 0,
+        dogstar_terry: 0,
+        dogstar_power: 0,
+        dogstar_xtar: 0,
+        total_claimable_terry: 0,
+        total_claimable_power: 0,
+        total_claimable_xtar: 0,
+    })
+}
+
+pub fn write_user_claimable_balance(e: &Env, user: &Address, balance: &UserClaimableBalance) {
+    let key = DataKey::UserClaimableBalance(user.clone());
+    e.storage().persistent().set(&key, balance);
+}
+
+pub fn read_user_claimable_balance(e: &Env, user: &Address) -> UserClaimableBalance {
+    let key = DataKey::UserClaimableBalance(user.clone());
+    e.storage().persistent().get(&key).unwrap_or(UserClaimableBalance {
+        terry: 0,
+        power: 0,
+        xtar: 0,
+        last_claim_round: 0,
+        last_claim_timestamp: 0,
+    })
+}
+
+pub fn write_dogstar_claimable(e: &Env, balance: &UserClaimableBalance) {
+    let key = DataKey::DogstarClaimableBalance;
+    e.storage().persistent().set(&key, balance);
+}
+
+pub fn read_dogstar_claimable(e: &Env) -> UserClaimableBalance {
+    let key = DataKey::DogstarClaimableBalance;
+    e.storage().persistent().get(&key).unwrap_or(UserClaimableBalance {
+        terry: 0,
+        power: 0,
+        xtar: 0,
+        last_claim_round: 0,
+        last_claim_timestamp: 0,
+    })
+}

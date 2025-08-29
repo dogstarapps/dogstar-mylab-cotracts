@@ -99,6 +99,30 @@ pub struct DogstarBalance {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractVault {
+    pub haw_ai_pot_terry: i128,
+    pub haw_ai_pot_power: u32,
+    pub haw_ai_pot_xtar: i128,
+    pub dogstar_terry: i128,
+    pub dogstar_power: u32,
+    pub dogstar_xtar: i128,
+    pub total_claimable_terry: i128,
+    pub total_claimable_power: u32,
+    pub total_claimable_xtar: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct UserClaimableBalance {
+    pub terry: i128,
+    pub power: u32,
+    pub xtar: i128,
+    pub last_claim_round: u32,
+    pub last_claim_timestamp: u64,
+}
+
+#[contracttype]
 #[derive(Clone, Eq, PartialEq)]
 pub struct Deck {
     pub owner: Address,
@@ -114,7 +138,6 @@ pub struct Deck {
 pub struct Config {
     pub xtar_token: Address,
     pub oracle_contract_id: Address,
-    pub haw_ai_pot: Address,
     pub withdrawable_percentage: u32,
     pub burnable_percentage: u32,
     pub haw_ai_percentage: u32,
@@ -129,9 +152,7 @@ pub struct Config {
     pub terry_per_stake: i128,
     pub apy_alpha: u32,
     pub power_to_usdc_rate: i128, // e.g., 1000 for 0.10 USDC per POWER (1000/10000 = 0.10)
-
     pub dogstar_fee_percentage: u32, // Basis points (e.g., 500 = 5%)
-    pub dogstar_address: Address,
 }
 
 #[contracttype]
@@ -168,6 +189,7 @@ pub enum DataKey {
     Balance,
     BalanceSC(Category),
     DogstarBalance,
+    ContractVault,
     // Global state and whitelists
     State,
     Whitelist(Address),
@@ -199,6 +221,8 @@ pub enum DataKey {
     PlayerShare(u32, Address),
     PlayerPower(u32, Address),
     PendingReward(u32, Address),
+    UserClaimableBalance(Address),
+    DogstarClaimableBalance,
     CurrentRound,
     AllRounds,
     RewardClaim(Address, u64),

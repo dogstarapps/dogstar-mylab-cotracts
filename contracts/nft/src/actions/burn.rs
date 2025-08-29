@@ -22,8 +22,8 @@ pub fn burn(env: Env, user: Address, token_id: TokenId) {
     // Mint owner's share
     mint_terry(&env, user.clone(), receive_amount);
 
-    // Accumulate to pot with Dogstar fee deduction
-    NFT::accumulate_pot(env.clone(), pot_terry, pot_power, 0, Some(owner.clone()), Some(Action::Burn));
+    // Accumulate to pot with Dogstar fee deduction (internal helper, no admin auth)
+    crate::pot::management::accumulate_pot_internal(&env, pot_terry, pot_power, 0, Some(owner.clone()), Some(Action::Burn));
 
     // Remove card and NFT
     remove_owner_card(&env, owner.clone(), token_id.clone());

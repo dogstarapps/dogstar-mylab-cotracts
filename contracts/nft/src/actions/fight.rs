@@ -166,7 +166,16 @@ pub fn get_liquidation_price(fight: &Fight) -> i128 {
     }
 }
 
-pub fn check_liquidation(env: Env, user: Address, category: Category, token_id: TokenId) {
+pub fn check_liquidation(
+    env: Env,
+    liquidator: Address,
+    user: Address,
+    category: Category,
+    token_id: TokenId,
+) {
+    // Require authorization from liquidator (can be anyone, but must be authenticated)
+    liquidator.require_auth();
+    
     let fight = read_fight(
         env.clone(),
         user.clone(),
@@ -179,11 +188,20 @@ pub fn check_liquidation(env: Env, user: Address, category: Category, token_id: 
         config.oracle_contract_id,
         fight.currency.clone(),
     );
+    
+    // Validate oracle price is recent and reasonable
+    assert!(current_price > 0, "Invalid oracle price");
+    assert!(current_price < i128::MAX / 2, "Oracle price too high");
+    
     let liq_price = get_liquidation_price(&fight);
     let is_liquidated = match fight.side_position {
         SidePosition::Long => current_price <= liq_price,
         SidePosition::Short => current_price >= liq_price,
     };
+    
+    // Only allow liquidation if position is actually underwater
+    assert!(is_liquidated, "Position is not liquidatable");
+    
     if is_liquidated {
         let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
         nft.power = 0;
@@ -208,12 +226,17 @@ pub fn open_position(
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     log!(&env, "fight >> nft to fight = ", nft);
     assert_eq!(nft.locked_by_action, Action::None, "Card is locked");
+    assert!(leverage >= 1 && leverage <= 100, "Invalid leverage");
+    assert!(power_staked > 0, "Power staked must be positive");
     let config = read_config(&env);
 
     // Deduct fee and staked POWER
     let power_fee = config.power_action_fee * power_staked / 100;
     assert!(nft.power >= power_staked + power_fee, "Insufficient POWER");
-    nft.power -= power_staked + power_fee;
+    nft.power = nft
+        .power
+        .checked_sub(power_staked + power_fee)
+        .expect("Insufficient POWER");
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
@@ -240,9 +263,17 @@ pub fn open_position(
 
     // let trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
 
-    assert!(trigger_price > 0, "Invalid oracle price");
+    // Enhanced oracle price validation
+    assert!(trigger_price > 0, "Invalid oracle price: must be positive");
+    assert!(trigger_price < i128::MAX / 100, "Oracle price exceeds maximum");
+    
+    // TODO: Add staleness check when timestamp is available from oracle
+    // assert!(price_timestamp > env.ledger().timestamp() - 3600, "Oracle price too stale");
 
-    let amount_asset = position_size * 1000000 / trigger_price;
+    let amount_asset = position_size
+        .checked_mul(1000000)
+        .expect("Overflow")
+        / trigger_price;
 
     // Store fight
     nft.locked_by_action = Action::Fight;
