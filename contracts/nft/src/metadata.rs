@@ -34,6 +34,7 @@ pub fn read_metadata(e: &Env, token_id: u32) -> CardMetadata {
 }
 
 pub fn write_metadata(e: &Env, token_id: u32, metadata: CardMetadata) {
+
     let key = DataKey::TokenId(token_id);
     e.storage().instance().set(&key, &metadata);
 
@@ -44,11 +45,16 @@ pub fn write_metadata(e: &Env, token_id: u32, metadata: CardMetadata) {
         .get(&DataKey::AllCardIds)
         .unwrap_or(Vec::new(&e));
 
-    // Agregamos el nuevo TokenId al listado
-    all_card_ids.push_back(TokenId(token_id));
-
-    // Actualizamos la lista de TokenIds en el almacenamiento
-    e.storage()
-        .persistent()
-        .set(&DataKey::AllCardIds, &all_card_ids);
+    // Verificamos si el TokenId ya existe en la lista
+    let token_id_exists = all_card_ids.contains(&TokenId(token_id));
+    
+    // Solo agregamos el TokenId si no existe previamente
+    if !token_id_exists {
+        all_card_ids.push_back(TokenId(token_id));
+        
+        // Actualizamos la lista de TokenIds en el almacenamiento
+        e.storage()
+            .persistent()
+            .set(&DataKey::AllCardIds, &all_card_ids);
+    }
 }
