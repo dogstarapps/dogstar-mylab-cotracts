@@ -336,7 +336,8 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
 
     let mut balance = read_balance(&env);
 
-    let power_fee = power * config.power_action_fee / 100;
+    let power_fee = (power as u64 * config.power_action_fee as u64 / 100) as u32;
+
     balance.haw_ai_power += power_fee;
 
     user.power += power;
@@ -418,7 +419,7 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
 
     assert!(
         user.power >= borrowing.power + interest_amount as u32,
-        "Insufficient fund to repay",
+        "Insufficient fund to repay"
     );
 
     user.power -= borrowing.power + interest_amount as u32;
@@ -549,7 +550,11 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     state = read_state(&env);
 
-    state.total_interest -= interest_amount;
+    if state.total_interest >= interest_amount {
+      state.total_interest -= interest_amount;
+    } else {
+        state.total_interest = 0;
+    }
     state.total_offer -= lending.power as u64;
 
     write_state(&env, &state);

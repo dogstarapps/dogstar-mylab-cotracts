@@ -765,6 +765,10 @@ impl NFT {
     pub fn get_all_rounds(env: Env) -> Vec<u32> {
         get_all_rounds(&env)
     }
+
+    pub fn get_current_round(env: Env) -> u32 {
+        get_current_round(&env)
+    }
 }
 
 // Stake, Fight, Lend & Borrow, Deck sections unchanged
