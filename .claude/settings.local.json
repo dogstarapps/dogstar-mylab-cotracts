@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(stellar network:*)",
+      "Bash(stellar keys:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

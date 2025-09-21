@@ -668,14 +668,14 @@ impl NFT {
         }
     }
 
-    pub fn claim_haw_ai_pot_share(env: Env, player: Address) {
+    pub fn claim_haw_ai_pot_share(env: Env, player: Address) -> Result<(i128, u32, i128), NFTError> {
         player.require_auth();
-        
+
         let mut claimable = read_user_claimable_balance(&env, &player);
         let config = read_config(&env);
-        
+
         if claimable.terry == 0 && claimable.power == 0 && claimable.xtar == 0 {
-            panic!("No rewards available to claim");
+            return Err(NFTError::NoRewardsAvailable);
         }
         
         let terry_to_claim = claimable.terry;
@@ -714,6 +714,8 @@ impl NFT {
         
         // Emit event
         emit_rewards_claimed(&env, &player, terry_to_claim, power_to_claim, xtar_to_claim);
+
+        Ok((terry_to_claim, power_to_claim, xtar_to_claim))
     }
     
     pub fn view_claimable_balance(env: Env, player: Address) -> UserClaimableBalance {
@@ -724,9 +726,9 @@ impl NFT {
         read_contract_vault(&env)
     }
     
-    pub fn claim_all_pending_rewards(env: Env, player: Address) {
+    pub fn claim_all_pending_rewards(env: Env, player: Address) -> Result<(i128, u32, i128), NFTError> {
         // Legacy function - redirect to new claim function
-        Self::claim_haw_ai_pot_share(env, player);
+        Self::claim_haw_ai_pot_share(env, player)
     }
 
     pub fn update_dogstar_fee_percentage(env: Env, fee_percentage: u32) {
