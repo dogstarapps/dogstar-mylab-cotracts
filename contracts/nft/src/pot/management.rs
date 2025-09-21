@@ -6,6 +6,7 @@ use crate::storage_types::{
 use crate::admin::{read_config};
 use crate::storage_types::UserClaimableBalance;
 use crate::nft_info::Action;
+use crate::user_info::read_user;
 use soroban_sdk::{Address, Env, Vec};
 
 const DAY_IN_LEDGERS: u32 = 17280;
@@ -162,7 +163,8 @@ pub fn get_eligible_players(env: &Env) -> Vec<Address> {
 
     for deck in decks.iter() {
         if deck.token_ids.len() == 4 {
-            eligible_players.push_back(deck.owner);
+            let user = read_user(env, deck.owner.clone())
+            eligible_players.push_back(deck.owner, user.level, user.power);
         }
     }
 
