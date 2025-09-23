@@ -163,8 +163,7 @@ pub fn get_eligible_players(env: &Env) -> Vec<Address> {
 
     for deck in decks.iter() {
         if deck.token_ids.len() == 4 {
-            let user = read_user(env, deck.owner.clone())
-            eligible_players.push_back(deck.owner, user.level, user.power);
+            eligible_players.push_back(deck.owner);
         }
     }
 
@@ -182,7 +181,8 @@ pub fn get_eligible_players_with_shares(env: &Env) -> Vec<(Address, u32)> {
         if deck.token_ids.len() == 4 {
             let effective_power = calculate_effective_power(deck.total_power, deck.bonus);
             total_effective_power += effective_power;
-            player_powers.push_back((player, effective_power));
+            let user = read_user(env, deck.owner.clone())
+            player_powers.push_back((player, user.level, user.power, effective_power));
         }
     }
 
