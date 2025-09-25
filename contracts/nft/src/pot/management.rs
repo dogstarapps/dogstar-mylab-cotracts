@@ -171,7 +171,7 @@ pub fn get_eligible_players(env: &Env) -> Vec<Address> {
 }
 
 
-pub fn get_eligible_players_with_shares(env: &Env) -> Vec<(Address, u32)> {
+pub fn get_eligible_players_with_shares(env: &Env) -> Vec<(Address, u32, u32, u32)> {
     let players = get_eligible_players(env);
     let mut total_effective_power: u32 = 0;
     let mut player_powers = Vec::new(env);
@@ -192,7 +192,7 @@ pub fn get_eligible_players_with_shares(env: &Env) -> Vec<(Address, u32)> {
         } else {
             0
         };
-        let user = read_user(env, deck.owner.clone())
+        let user = read_user(env, player.clone());
         result.push_back((player, user.level, user.power, share_percentage));
     }
     result
