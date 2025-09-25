@@ -340,7 +340,7 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     assert!(current_price > 0, "Invalid oracle price");
     assert!(fight.trigger_price > 0, "Invalid trigger price");
     let pnl_usdc = position_size * (current_price - fight.trigger_price) / fight.trigger_price;
-    let pnl_usdc = fight.side_position === "Long" ? pnl_usdc : -1 * pnl_usdc;
+    let pnl_usdc = fight.side_position === SidePosition::Long ? pnl_usdc : -1 * pnl_usdc;
     let pnl_power = pnl_usdc * 10000 / power_to_usdc_rate;
     log!(&env, "pnl = ", pnl_usdc, pnl_power);
     // Update POWER with cap
