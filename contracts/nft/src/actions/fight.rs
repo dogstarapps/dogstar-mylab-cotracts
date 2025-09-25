@@ -139,7 +139,8 @@ pub fn get_currency_price(env: Env, oracle_contract_id: Address, currency: Fight
     let asset = match currency {
         FightCurrency::BTC => Asset::Other(Symbol::new(&env, "BTC")),
         FightCurrency::ETH => Asset::Other(Symbol::new(&env, "ETH")),
-        FightCurrency::XLM => Asset::Stellar(oracle_contract_id.clone()),
+        // FightCurrency::XLM => Asset::Other(oracle_contract_id.clone()),
+        FightCurrency::XLM => Asset::Other(Symbol::new(&env, "XLM")),
         FightCurrency::SOL => Asset::Other(Symbol::new(&env, "SOL")),
     };
     let args: Vec<Val> = (asset.clone(),).into_val(&env);
