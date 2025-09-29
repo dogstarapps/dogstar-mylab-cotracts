@@ -344,17 +344,26 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     let pnl_usdc = if fight.side_position == SidePosition::Long { pnl_usdc } else { -1 * pnl_usdc };
     let pnl_power = pnl_usdc * 10000 / power_to_usdc_rate;
     log!(&env, "pnl = ", pnl_usdc, pnl_power);
-    // Update POWER with cap
-    let card_metadata = crate::metadata::read_metadata(&env, token_id.0);
-    nft.power = (nft.power as i128 + pnl_power)
-        .max(0)
-        .min(card_metadata.max_power as i128) as u32;
 
-    // Forfeit card if POWER is 0
-    if nft.power == 0 {
+    let card_metadata = crate::metadata::read_metadata(&env, token_id.0);
+
+    // Calculate trading result: staked fight power + P&L
+    let trading_result = fight.power as i128 + pnl_power;
+    log!(&env, "trading calculation: fight.power =", fight.power, "pnl_power =", pnl_power, "trading_result =", trading_result);
+
+    let final_power = if trading_result < 0 {
+        nft.power
+    } else {
+        nft.power + trading_result as u32
+    };
+
+    log!(&env, "power calculation: nft.power =", nft.power, "final_power =", final_power);
+
+    if final_power == 0 {
         remove_owner_card(&env, user.clone(), token_id.clone());
         remove_nft(&env, user.clone(), token_id.clone());
     } else {
+        nft.power = final_power.min(card_metadata.max_power);
         nft.locked_by_action = Action::None;
         write_nft(&env, owner.clone(), token_id.clone(), nft);
     }
