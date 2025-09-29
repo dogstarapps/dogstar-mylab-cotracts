@@ -24,9 +24,9 @@ pub fn burn(env: Env, user: Address, token_id: TokenId) {
     let pot_power = total_power as i128 - receive_power;
 
     // Mint owner's share
-    mint_terry(&env, owner.clone(), receive_amount);
     user.power += receive_power as u32;
     write_user(&env.clone(), owner.clone(), user);
+    mint_terry(&env, owner.clone(), receive_amount);
     // Accumulate to pot with Dogstar fee deduction (internal helper, no admin auth)
     crate::pot::management::accumulate_pot_internal(&env, pot_terry, pot_power as u32, 0, Some(owner.clone()), Some(Action::Burn));
 
