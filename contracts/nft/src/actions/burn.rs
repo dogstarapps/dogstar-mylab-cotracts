@@ -1,4 +1,3 @@
-use crate::contract::NFT;
 use crate::{user_info::mint_terry, *};
 use admin::read_config;
 use metadata::read_metadata;
@@ -21,15 +20,15 @@ pub fn burn(env: Env, user: Address, token_id: TokenId) {
     let receive_amount = terry_amount * config.burn_receive_percentage as i128 / 100;
     let pot_terry = terry_amount - receive_amount; // Terry to pot
     let total_power = card_metadata.initial_power + nft.power / 2;
-    let receive_power = total_power * config.burn_receive_percentage as i128 /100;
-    let pot_power = total_power - receive_power;
+    let receive_power = total_power as i128 * config.burn_receive_percentage as i128 /100;
+    let pot_power = total_power as i128 - receive_power;
 
     // Mint owner's share
-    mint_terry(&env, user.clone(), receive_amount);
-    user.power += receive_power;
-    write_user(&env.clone(), owner.clon(), user);
+    mint_terry(&env, owner.clone(), receive_amount);
+    user.power += receive_power as u32;
+    write_user(&env.clone(), owner.clone(), user);
     // Accumulate to pot with Dogstar fee deduction (internal helper, no admin auth)
-    crate::pot::management::accumulate_pot_internal(&env, pot_terry, pot_power, 0, Some(owner.clone()), Some(Action::Burn));
+    crate::pot::management::accumulate_pot_internal(&env, pot_terry, pot_power as u32, 0, Some(owner.clone()), Some(Action::Burn));
 
     // Remove card and NFT
     remove_owner_card(&env, owner.clone(), token_id.clone());
