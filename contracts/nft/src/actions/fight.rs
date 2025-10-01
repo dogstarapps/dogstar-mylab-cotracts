@@ -240,7 +240,6 @@ pub fn open_position(
         .expect("Insufficient POWER");
 
     let mut balance = read_balance(&env);
-    balance.haw_ai_power += power_fee;
 
     // Calculate position
     let power_to_usdc_rate = config.power_to_usdc_rate;
@@ -298,8 +297,22 @@ pub fn open_position(
     );
 
     // Mint TERRY rewards
-    mint_terry(&env, owner, config.terry_per_fight);
-    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    let terry_reward = config.terry_per_fight;
+    let terry_to_haw_ai = terry_reward * config.haw_ai_percentage as i128 / 100;
+    
+    mint_terry(&env, owner.clone(), terry_reward);
+    balance.haw_ai_terry += terry_to_haw_ai;
+    
+    // Send power fee and terry to haw_ai_pot
+    crate::pot::management::accumulate_pot_internal(
+        &env, 
+        terry_to_haw_ai, 
+        power_fee, 
+        0, 
+        Some(owner), 
+        Some(Action::Fight)
+    );
+    
     write_balance(&env, &balance);
 }
 
@@ -352,9 +365,38 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     log!(&env, "trading calculation: fight.power =", fight.power, "pnl_power =", pnl_power, "trading_result =", trading_result);
 
     let final_power = if trading_result < 0 {
+        // Loss: user loses all staked power
         nft.power
     } else {
-        nft.power + trading_result as u32
+        // Profit: split between haw_ai and user
+        let profit = pnl_power; // Only the profit part, not including the original stake
+        
+        if profit > 0 {
+            // Split profit: haw_ai gets percentage, user gets the rest
+            let profit_to_haw_ai = (profit * config.haw_ai_percentage as i128) / 100;
+            let profit_to_user = profit - profit_to_haw_ai;
+            
+            log!(&env, "profit split: total_profit =", profit, "haw_ai =", profit_to_haw_ai, "user =", profit_to_user);
+            
+            // Send haw_ai's share to pot
+            if profit_to_haw_ai > 0 {
+                balance.haw_ai_power += profit_to_haw_ai as u32;
+                crate::pot::management::accumulate_pot_internal(
+                    &env,
+                    0,
+                    profit_to_haw_ai as u32,
+                    0,
+                    Some(owner.clone()),
+                    Some(Action::Fight)
+                );
+            }
+            
+            // Return user's profit + original stake
+            nft.power + fight.power + profit_to_user as u32
+        } else {
+            // No profit, just return original stake
+            nft.power + fight.power
+        }
     };
 
     log!(&env, "power calculation: nft.power =", nft.power, "final_power =", final_power);
@@ -372,7 +414,21 @@ pub fn close_position(env: Env, user: Address, category: Category, token_id: Tok
     remove_fight(env.clone(), owner.clone(), category.clone(), token_id);
 
     // Mint TERRY rewards
-    mint_terry(&env, owner, config.terry_per_fight);
-    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    let terry_reward = config.terry_per_fight;
+    let terry_to_haw_ai = terry_reward * config.haw_ai_percentage as i128 / 100;
+    
+    mint_terry(&env, owner.clone(), terry_reward);
+    balance.haw_ai_terry += terry_to_haw_ai;
+    
+    // Send terry to haw_ai_pot
+    crate::pot::management::accumulate_pot_internal(
+        &env,
+        terry_to_haw_ai,
+        0,
+        0,
+        Some(owner),
+        Some(Action::Fight)
+    );
+    
     write_balance(&env, &balance);
 }
