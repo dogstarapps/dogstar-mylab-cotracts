@@ -239,7 +239,8 @@ fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
 pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
     user.require_auth();
     let owner = read_user(&env, user).owner;
-
+    let power_fee = power * config.power_action_fee / 100;
+    let lend_amount = power as u64 - power_fee;
     assert!(
         category == Category::Resource || category == Category::Leader,
         "Invalid Category to lend"
@@ -259,7 +260,6 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
     let config = read_config(&env);
     let mut balance = read_balance(&env);
 
-    let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
     let mut state = read_state(&env);
@@ -272,7 +272,7 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
         lender: owner.clone(),
         category: category.clone(),
         token_id: token_id.clone(),
-        power,
+        power: lend_amount,
         lent_at: env.ledger().timestamp(),
     };
 
@@ -295,6 +295,8 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
     user.require_auth();
     let mut user = read_user(&env, user.clone());
     let owner = user.owner.clone();
+    let power_fee = (power as u64 * config.power_action_fee as u64 / 100) as u64;
+    let borrow_amount = power as u64 - power_fee;
 
     assert!(
         category == Category::Resource || category == Category::Leader,
@@ -315,8 +317,8 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         "Insufficient power to borrow"
     );
 
-    state.total_offer -= power as u64;
-    state.total_borrowed_power += power as u64;
+    state.total_offer -= borrow_amount as u64;
+    state.total_borrowed_power += borrow_amount as u64;
 
     write_state(&env, &state);
 
@@ -336,11 +338,10 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
 
     let mut balance = read_balance(&env);
 
-    let power_fee = (power as u64 * config.power_action_fee as u64 / 100) as u32;
 
     balance.haw_ai_power += power_fee;
 
-    user.power += power;
+    user.power += borrow_amount;
 
     write_user(&env.clone(), owner.clone(), user);
 
@@ -348,7 +349,7 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         borrower: owner.clone(),
         category: category.clone(),
         token_id: token_id.clone(),
-        power: power.clone(),
+        power: borrow_amount.clone(),
         borrowed_at: env.ledger().timestamp(),
     };
 
