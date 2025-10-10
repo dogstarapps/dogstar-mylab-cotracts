@@ -264,7 +264,7 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
 
     let mut state = read_state(&env);
 
-    state.total_offer += power as u64;
+    state.total_offer += lend_amount as u64;
 
     write_state(&env, &state);
 
@@ -318,7 +318,7 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         "Insufficient power to borrow"
     );
 
-    state.total_offer -= borrow_amount as u64;
+    state.total_offer -= power as u64;
     state.total_borrowed_power += borrow_amount as u64;
 
     write_state(&env, &state);
@@ -565,7 +565,10 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
-    user.power += interest_amount as u32;
+    power_fee = interest_amount.saturating_mul(config.power_action_fee) / 100;
+    reward_interest = interest_amount.saturating_sub(power_fee)
+
+    user.power += reward_interest as u32;
 
     write_user(&env, owner.clone(), user);
 
@@ -576,6 +579,7 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
     mint_terry(&env, owner.clone(), config.terry_per_lending);
 
     let mut balance = read_balance(&env);
+    balance.haw_ai_power += power_fee;
     balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
     write_balance(&env, &balance);
 }
