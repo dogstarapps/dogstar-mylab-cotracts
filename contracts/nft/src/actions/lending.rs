@@ -565,8 +565,9 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
-    power_fee = interest_amount.saturating_mul(config.power_action_fee) / 100;
-    reward_interest = interest_amount.saturating_sub(power_fee)
+    let power_fee: u32 =
+        (interest_amount.saturating_mul(config.power_action_fee as u64) / 100) as u32;
+    let reward_interest: u64 = interest_amount.saturating_sub(power_fee as u64);
 
     user.power += reward_interest as u32;
 
