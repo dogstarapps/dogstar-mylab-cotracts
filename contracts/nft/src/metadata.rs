@@ -8,10 +8,6 @@ use crate::{
 #[derive(Clone)]
 #[contracttype]
 pub struct CardMetadata {
-    pub name: String,
-    pub base_uri: String,
-    pub thumb_uri: String,
-    pub description: String,
     pub initial_power: u32,
     pub max_power: u32,
     pub level: u32,
