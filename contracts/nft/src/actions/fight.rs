@@ -1,7 +1,7 @@
 use crate::{nft_info::remove_nft, user_info::mint_terry, *};
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, Val, Vec, log};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
 
@@ -51,15 +51,9 @@ pub struct Fight {
     pub amount_asset: i128,
 }
 
-pub fn write_fight(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-    fight: Fight,
-) {
-    // fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn write_fight(env: Env, user: Address, category: Category, token_id: TokenId, fight: Fight) {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &fight);
@@ -83,11 +77,14 @@ pub fn write_fight(
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 
-    env.events().publish((symbol_short!("fight"), symbol_short!("open")), fight.clone())
+    env.events().publish(
+        (symbol_short!("fight"), symbol_short!("open")),
+        fight.clone(),
+    )
 }
 
-pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) -> Fight {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_fight(env: Env, user: Address, category: Category, token_id: TokenId) -> Fight {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -96,18 +93,9 @@ pub fn read_fight(env: Env, fee_payer: Address, category: Category, token_id: To
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
-    let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
-    env.storage().persistent().remove(&key);
-
-    if env.storage().persistent().has(&key) {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    }
+pub fn remove_fight(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user).owner;
+    
     let key = DataKey::Fights;
     let mut fights = read_fights(env.clone());
     if let Some(pos) = fights.iter().position(|fight| {
@@ -119,7 +107,10 @@ pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: 
             category.clone(),
             token_id.clone(),
         );
-        env.events().publish((symbol_short!("fight"), symbol_short!("close")), fight.clone());
+        env.events().publish(
+            (symbol_short!("fight"), symbol_short!("close")),
+            fight.clone(),
+        );
         fights.remove(pos.try_into().unwrap());
     }
 
@@ -128,6 +119,11 @@ pub fn remove_fight(env: Env, fee_payer: Address, category: Category, token_id: 
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
+    log!(&env, "remove_fight >> ", owner.clone());
+    let key = DataKey::Fight(owner.clone(), category.clone(), token_id.clone());
+    log!(&env, "remove_fight >> ", "key = ", key);
+    env.storage().persistent().remove(&key);
 }
 
 pub fn read_fights(env: Env) -> Vec<Fight> {
@@ -143,7 +139,8 @@ pub fn get_currency_price(env: Env, oracle_contract_id: Address, currency: Fight
     let asset = match currency {
         FightCurrency::BTC => Asset::Other(Symbol::new(&env, "BTC")),
         FightCurrency::ETH => Asset::Other(Symbol::new(&env, "ETH")),
-        FightCurrency::XLM => Asset::Stellar(oracle_contract_id.clone()),
+        // FightCurrency::XLM => Asset::Other(oracle_contract_id.clone()),
+        FightCurrency::XLM => Asset::Other(Symbol::new(&env, "XLM")),
         FightCurrency::SOL => Asset::Other(Symbol::new(&env, "SOL")),
     };
     let args: Vec<Val> = (asset.clone(),).into_val(&env);
@@ -170,10 +167,19 @@ pub fn get_liquidation_price(fight: &Fight) -> i128 {
     }
 }
 
-pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
+pub fn check_liquidation(
+    env: Env,
+    liquidator: Address,
+    user: Address,
+    category: Category,
+    token_id: TokenId,
+) {
+    // Require authorization from liquidator (can be anyone, but must be authenticated)
+    liquidator.require_auth();
+    
     let fight = read_fight(
         env.clone(),
-        fee_payer.clone(),
+        user.clone(),
         category.clone(),
         token_id.clone(),
     );
@@ -183,23 +189,32 @@ pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token
         config.oracle_contract_id,
         fight.currency.clone(),
     );
+    
+    // Validate oracle price is recent and reasonable
+    assert!(current_price > 0, "Invalid oracle price");
+    assert!(current_price < i128::MAX / 2, "Oracle price too high");
+    
     let liq_price = get_liquidation_price(&fight);
     let is_liquidated = match fight.side_position {
         SidePosition::Long => current_price <= liq_price,
         SidePosition::Short => current_price >= liq_price,
     };
+    
+    // Only allow liquidation if position is actually underwater
+    assert!(is_liquidated, "Position is not liquidatable");
+    
     if is_liquidated {
-        let mut nft = read_nft(&env, fee_payer.clone(), token_id.clone()).unwrap();
+        let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
         nft.power = 0;
-        remove_owner_card(&env, fee_payer.clone(), token_id.clone());
-        remove_nft(&env, fee_payer.clone(), token_id.clone());
-        remove_fight(env, fee_payer, category, token_id);
+        remove_owner_card(&env, user.clone(), token_id.clone());
+        remove_nft(&env, user.clone(), token_id.clone());
+        remove_fight(env, user, category, token_id);
     }
 }
 
 pub fn open_position(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     currency: FightCurrency,
@@ -207,19 +222,24 @@ pub fn open_position(
     leverage: u32,
     power_staked: u32,
 ) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    log!(&env, "fight >> nft to fight = ", nft);
     assert_eq!(nft.locked_by_action, Action::None, "Card is locked");
+    assert!(leverage >= 1 && leverage <= 100, "Invalid leverage");
+    assert!(power_staked > 0, "Power staked must be positive");
     let config = read_config(&env);
 
     // Deduct fee and staked POWER
     let power_fee = config.power_action_fee * power_staked / 100;
     assert!(nft.power >= power_staked + power_fee, "Insufficient POWER");
-    nft.power -= power_staked + power_fee;
+    nft.power = nft
+        .power
+        .checked_sub(power_staked + power_fee)
+        .expect("Insufficient POWER");
 
     let mut balance = read_balance(&env);
-    balance.haw_ai_power += power_fee;
 
     // Calculate position
     let power_to_usdc_rate = config.power_to_usdc_rate;
@@ -227,24 +247,33 @@ pub fn open_position(
     let position_size = margin_usdc * leverage as i128;
 
     // Get currency price from oracle (1)
-    // let mut trigger_price = 0;
+    let mut trigger_price = 0;
 
-    // #[cfg(not(test))]
-    // {
-    //     trigger_price =
-    //         get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
-    // }
+    #[cfg(not(test))]
+    {
+        trigger_price =
+            get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
+    }
+    log!(&env, "fight >> trigger_price = ", trigger_price);
     // #[cfg(test)]
     // {
     //     trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
 
     // Get currency price from oracle (2)
 
-    let trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
+    // let trigger_price = 8382580000; // Mock price for tests (83,825.8 USDC)
 
-    assert!(trigger_price > 0, "Invalid oracle price");
+    // Enhanced oracle price validation
+    assert!(trigger_price > 0, "Invalid oracle price: must be positive");
+    assert!(trigger_price < i128::MAX / 100, "Oracle price exceeds maximum");
+    
+    // TODO: Add staleness check when timestamp is available from oracle
+    // assert!(price_timestamp > env.ledger().timestamp() - 3600, "Oracle price too stale");
 
-    let amount_asset = position_size * 1000000 / trigger_price;
+    let amount_asset = position_size
+        .checked_mul(1000000)
+        .expect("Overflow")
+        / trigger_price;
 
     // Store fight
     nft.locked_by_action = Action::Fight;
@@ -268,30 +297,46 @@ pub fn open_position(
     );
 
     // Mint TERRY rewards
-    mint_terry(&env, owner, config.terry_per_fight);
-    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    let terry_reward = config.terry_per_fight;
+    let terry_to_haw_ai = terry_reward * config.haw_ai_percentage as i128 / 100;
+    
+    mint_terry(&env, owner.clone(), terry_reward);
+    balance.haw_ai_terry += terry_to_haw_ai;
+    
+    // Send power fee and terry to haw_ai_pot
+    crate::pot::management::accumulate_pot_internal(
+        &env, 
+        terry_to_haw_ai, 
+        power_fee, 
+        0, 
+        Some(owner), 
+        Some(Action::Fight)
+    );
+    
     write_balance(&env, &balance);
 }
 
-pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer.clone()).owner;
+pub fn close_position(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let owner = read_user(&env, user.clone()).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    log!(&env, "read nft = ", nft.clone());
     let fight = read_fight(
         env.clone(),
         owner.clone(),
         category.clone(),
         token_id.clone(),
     );
+    log!(&env, "read fight = ", fight.clone());
     let config = read_config(&env);
     let mut balance = read_balance(&env);
 
     // Deduct fee
-    let power_fee = config.power_action_fee * fight.power / 100;
-    assert!(nft.power >= power_fee, "Insufficient POWER for fee");
-    nft.power -= power_fee;
-    balance.haw_ai_power += power_fee;
-
+    // let power_fee = config.power_action_fee * fight.power / 100;
+    // assert!(nft.power >= power_fee, "Insufficient POWER for fee");
+    // nft.power -= power_fee;
+    // balance.haw_ai_power += power_fee;
+    // log!(&env, "calculated power fee = ", power_fee.clone());
     // Calculate PnL
     let power_to_usdc_rate = config.power_to_usdc_rate;
     let margin_usdc = (fight.power as i128) * power_to_usdc_rate / 10000;
@@ -303,33 +348,87 @@ pub fn close_position(env: Env, fee_payer: Address, category: Category, token_id
     }
     #[cfg(test)]
     {
-        current_price = 8600000000; // Mock price for tests (86,000 USDC)
+        current_price = 86000; // Mock price for tests (86,000 USDC)
     }
+    log!(&env, "current asset price", current_price.clone());
     assert!(current_price > 0, "Invalid oracle price");
     assert!(fight.trigger_price > 0, "Invalid trigger price");
     let pnl_usdc = position_size * (current_price - fight.trigger_price) / fight.trigger_price;
+    let pnl_usdc = if fight.side_position == SidePosition::Long { pnl_usdc } else { -1 * pnl_usdc };
     let pnl_power = pnl_usdc * 10000 / power_to_usdc_rate;
+    log!(&env, "pnl = ", pnl_usdc, pnl_power);
 
-    // Update POWER with cap
     let card_metadata = crate::metadata::read_metadata(&env, token_id.0);
-    nft.power = (nft.power as i128 + pnl_power)
-        .max(0)
-        .min(card_metadata.max_power as i128) as u32;
 
-    // Forfeit card if POWER is 0
-    if nft.power == 0 {
-        remove_owner_card(&env, fee_payer.clone(), token_id.clone());
-        remove_nft(&env, fee_payer.clone(), token_id.clone());
+    // Calculate trading result: staked fight power + P&L
+    let trading_result = fight.power as i128 + pnl_power;
+    log!(&env, "trading calculation: fight.power =", fight.power, "pnl_power =", pnl_power, "trading_result =", trading_result);
+
+    let final_power = if trading_result < 0 {
+        // Loss: user loses all staked power
+        nft.power
     } else {
+        // Profit: split between haw_ai and user
+        let profit = pnl_power; // Only the profit part, not including the original stake
+        
+        if profit > 0 {
+            // Split profit: haw_ai gets percentage, user gets the rest
+            let profit_to_haw_ai = (profit * config.haw_ai_percentage as i128) / 100;
+            let profit_to_user = profit - profit_to_haw_ai;
+            
+            log!(&env, "profit split: total_profit =", profit, "haw_ai =", profit_to_haw_ai, "user =", profit_to_user);
+            
+            // Send haw_ai's share to pot
+            if profit_to_haw_ai > 0 {
+                balance.haw_ai_power += profit_to_haw_ai as u32;
+                crate::pot::management::accumulate_pot_internal(
+                    &env,
+                    0,
+                    profit_to_haw_ai as u32,
+                    0,
+                    Some(owner.clone()),
+                    Some(Action::Fight)
+                );
+            }
+            
+            // Return user's profit + original stake
+            nft.power + fight.power + profit_to_user as u32
+        } else {
+            // No profit, just return original stake
+            nft.power + fight.power
+        }
+    };
+
+    log!(&env, "power calculation: nft.power =", nft.power, "final_power =", final_power);
+
+    if final_power == 0 {
+        remove_owner_card(&env, user.clone(), token_id.clone());
+        remove_nft(&env, user.clone(), token_id.clone());
+    } else {
+        nft.power = final_power.min(card_metadata.max_power);
         nft.locked_by_action = Action::None;
         write_nft(&env, owner.clone(), token_id.clone(), nft);
     }
-
+    log!(&env, "remove fight", fight.token_id.clone());
     // Remove fight
     remove_fight(env.clone(), owner.clone(), category.clone(), token_id);
 
     // Mint TERRY rewards
-    mint_terry(&env, owner, config.terry_per_fight);
-    balance.haw_ai_terry += config.terry_per_fight * config.haw_ai_percentage as i128 / 100;
+    let terry_reward = config.terry_per_fight;
+    let terry_to_haw_ai = terry_reward * config.haw_ai_percentage as i128 / 100;
+    
+    mint_terry(&env, owner.clone(), terry_reward);
+    balance.haw_ai_terry += terry_to_haw_ai;
+    
+    // Send terry to haw_ai_pot
+    crate::pot::management::accumulate_pot_internal(
+        &env,
+        terry_to_haw_ai,
+        0,
+        0,
+        Some(owner),
+        Some(Action::Fight)
+    );
+    
     write_balance(&env, &balance);
 }

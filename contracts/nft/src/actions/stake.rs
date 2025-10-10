@@ -1,5 +1,5 @@
 use crate::{user_info::mint_terry, *};
-use admin::{ read_balance, read_config, write_balance, read_state, write_state };
+use admin::{read_balance, read_config, read_state, write_balance, write_state};
 use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec, symbol_short};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
@@ -17,14 +17,8 @@ pub struct Stake {
     pub staked_time: u32,
 }
 
-pub fn write_stake(
-    env: &Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-    stake: Stake,
-) {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn write_stake(env: &Env, user: Address, category: Category, token_id: TokenId, stake: Stake) {
+    let owner = read_user(&env, user).owner;
     let key = DataKey::Stake(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &stake);
     env.storage()
@@ -56,8 +50,8 @@ pub fn read_stakes(env: Env) -> Vec<Stake> {
         .unwrap_or(vec![&env.clone()])
 }
 
-pub fn remove_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn remove_stake(env: &Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Stake(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -89,8 +83,8 @@ pub fn remove_stake(env: &Env, fee_payer: Address, category: Category, token_id:
     }
 }
 
-pub fn read_stake(env: &Env, fee_payer: Address, category: Category, token_id: TokenId) -> Stake {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_stake(env: &Env, user: Address, category: Category, token_id: TokenId) -> Stake {
+    let owner = read_user(&env, user).owner;
     let key = DataKey::Stake(owner, category, token_id);
     #[cfg(not(test))]
     {
@@ -103,28 +97,28 @@ pub fn read_stake(env: &Env, fee_payer: Address, category: Category, token_id: T
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn stake(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-    period_index: u32,
-) {
-    fee_payer.require_auth();
+pub fn stake(env: Env, user: Address, category: Category, token_id: TokenId, period_index: u32) {
+    user.require_auth();
     assert!(
         category == Category::Skill || category == Category::Leader,
         "Invalid Category to stake"
     );
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, user).owner;
 
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::None, "Locked NFT");
 
     let config = read_config(&env);
+    // Validate period index bounds to avoid panic
+    assert!(period_index < config.stake_periods.len(), "Invalid period index");
+    assert!(period_index < config.stake_interest_percentages.len(), "Invalid period index");
     let power_fee = config.power_action_fee * nft.power / 100;
 
     nft.locked_by_action = Action::Stake;
-    let staked_power = nft.power.clone() - power_fee;
+    let staked_power = nft
+        .power
+        .checked_sub(power_fee)
+        .expect("Insufficient POWER for fee");
     nft.power = 0;
 
     let mut balance = read_balance(&env);
@@ -165,25 +159,40 @@ pub fn stake(
 
 pub fn increase_stake_power(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     increase_power: u32,
 ) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
+    
+    // Input validation
+    assert!(increase_power > 0, "Increase power must be positive");
+    assert!(increase_power <= u32::MAX / 2, "Increase power too large");
 
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
+    assert!(nft.power >= increase_power, "Insufficient NFT power");
 
     let mut stake = read_stake(&env, owner.clone(), category.clone(), token_id.clone());
-    stake.power += increase_power;
+    
+    // Safe addition to prevent overflow
+    stake.power = stake.power.checked_add(increase_power)
+        .expect("Stake power overflow");
 
     let config = read_config(&env);
-    let power_fee = config.power_action_fee * increase_power / 100;
-    stake.power -= power_fee;
+    let power_fee = config.power_action_fee.checked_mul(increase_power)
+        .and_then(|v| v.checked_div(100))
+        .expect("Fee calculation overflow");
+    
+    // Safe subtraction to prevent underflow
+    stake.power = stake.power.checked_sub(power_fee)
+        .expect("Insufficient stake power for fee");
 
-    nft.power -= increase_power;
+    // Safe subtraction to prevent underflow
+    nft.power = nft.power.checked_sub(increase_power)
+        .expect("Insufficient NFT power");
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     let mut balance = read_balance(&env);
@@ -204,9 +213,9 @@ pub fn increase_stake_power(
     write_balance(&env, &balance);
 }
 
-pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn unstake(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
     let mut nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
     assert!(nft.locked_by_action == Action::Stake, "Can't find staked");
 

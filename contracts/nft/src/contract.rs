@@ -1,22 +1,32 @@
 //! This contract demonstrates a sample implementation of the Soroban token
 //! interface.
 
-use crate::actions::{burn, deck, fight, lending, lending::{Lending, Borrowing}, stake, Deck, SidePosition};
+use crate::actions::{read_deck, deck::read_decks};
+use crate::actions::{
+    burn, deck, fight, lending,
+    lending::{Borrowing, Lending},
+    stake, SidePosition,
+};
 use crate::admin::{
     add_level, has_administrator, read_administrator, read_balance, read_config, read_state,
-    update_level, write_administrator, write_balance, write_config, Balance, Config, State,
+    update_level, write_administrator, write_balance, write_config, read_contract_vault,
+    write_contract_vault, read_user_claimable_balance, write_user_claimable_balance,
+    read_dogstar_claimable, write_dogstar_claimable,
 };
+use crate::error::NFTError;
+use crate::event::*;
 use crate::metadata::{read_metadata, write_metadata, CardMetadata};
 use crate::nft_info::{exists, read_nft, remove_nft, write_nft, Action, Card, Category, Currency};
-use crate::storage_types::{
-    DataKey, Level, TokenId, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
-};
+use crate::pot::management::*;
+use crate::pot::reward::*;
+use crate::storage_types::*;
 use crate::user_info::{
     add_card_to_owner, burn_terry, get_user_level, mint_terry, read_owner_card, read_user,
-    write_user, User,
+    write_owner_card, write_user,
 };
 
-use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
+use soroban_sdk::{
+    contract, contractimpl, token, Address, BytesN, Env, Symbol};
 use soroban_sdk::{vec, String, Vec};
 use soroban_token_sdk::TokenUtils;
 
@@ -26,8 +36,9 @@ pub struct NFT;
 #[contractimpl]
 impl NFT {
     pub fn initialize(e: Env, admin: Address, config: Config) {
+        // Check if the contract is already initialized
         if has_administrator(&e) {
-            panic!("already initialized")
+            panic!("already initialized");
         }
         write_administrator(&e, &admin);
         write_config(&e, &config);
@@ -42,9 +53,25 @@ impl NFT {
                 total_deck_power: 0,
             },
         );
+        
+        // Initialize the contract vault
+        write_contract_vault(
+            &e,
+            &ContractVault {
+                haw_ai_pot_terry: 0,
+                haw_ai_pot_power: 0,
+                haw_ai_pot_xtar: 0,
+                dogstar_terry: 0,
+                dogstar_power: 0,
+                dogstar_xtar: 0,
+                total_claimable_terry: 0,
+                total_claimable_power: 0,
+                total_claimable_xtar: 0,
+            },
+        );
 
         let levels = vec![
-            &e.clone(),
+            &e,
             Level {
                 minimum_terry: 0,
                 maximum_terry: 1000,
@@ -100,35 +127,47 @@ impl NFT {
         for (_, level) in levels.into_iter().enumerate() {
             add_level(&e, level);
         }
+
+        // Emit initialization event
+        e.events()
+            .publish((Symbol::new(&e, "initialized"),), (admin,));
     }
 
     pub fn add_new_level(e: Env, level: Level) {
         let admin: Address = read_administrator(&e);
         admin.require_auth();
-
         add_level(&e, level);
     }
 
     pub fn update_level(e: Env, level_id: u32, level: Level) {
         let admin: Address = read_administrator(&e);
         admin.require_auth();
-
         update_level(&e, level_id, level);
     }
 
     pub fn mint_terry(e: Env, player: Address, amount: i128) {
         let admin = read_administrator(&e);
         admin.require_auth();
-
         mint_terry(&e, player, amount);
     }
 
     pub fn batch_mint_terry(e: Env, to_addresses: Vec<Address>, amounts: Vec<i128>) {
         let admin = read_administrator(&e);
         admin.require_auth();
-
         if to_addresses.len() != amounts.len() {
             panic!("Mismatched lengths of addresses and amounts");
+        }
+        
+        // Define maximum mint amount per transaction (e.g., 1 billion)
+        const MAX_MINT_AMOUNT: i128 = 1_000_000_000;
+        const MAX_BATCH_SIZE: u32 = 100;
+        
+        assert!(to_addresses.len() <= MAX_BATCH_SIZE, "Batch size too large");
+        
+        // Validate all amounts before processing
+        for amount in amounts.iter() {
+            assert!(amount > 0, "Mint amount must be positive");
+            assert!(amount <= MAX_MINT_AMOUNT, "Mint amount exceeds maximum");
         }
 
         for (to, amount) in to_addresses.iter().zip(amounts.iter()) {
@@ -143,22 +182,21 @@ impl NFT {
 
     pub fn mint(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         token_id: TokenId,
         card_level: u32,
         buy_currency: Currency,
     ) {
-        fee_payer.require_auth();
+        user.require_auth();
 
-        let user: User = read_user(&env, fee_payer.clone());
-        let to: Address = user.owner;
+        let user: User = read_user(&env, user.clone());
+        let to: Address = user.owner.clone();
         let user_level = get_user_level(&env, to.clone());
 
         assert!(
             user_level >= card_level,
             "User level too low to mint this card"
         );
-
         assert!(
             !Self::exists(&env, to.clone(), token_id.clone()),
             "Token ID already exists"
@@ -171,62 +209,103 @@ impl NFT {
         };
         write_nft(&env, to.clone(), token_id.clone(), nft.clone());
 
-        add_card_to_owner(&env, token_id.clone(), to.clone());
-        // // puchase by currency
+        add_card_to_owner(&env, token_id.clone(), to.clone()).map_err(|_e| NFTError::NotAuthorized).unwrap();
+
+
         let config: Config = read_config(&env);
         let mut balance = read_balance(&env);
 
+        // matches!(buy_currency, Currency::Terry)
+        //     .then(|| {
+        //         assert!(
+        //             user.terry >= card_metadata.price_terry,
+        //             "Not enough terry to mint this card"
+        //         );
+        //     })
+        //     .unwrap_or_else(|| {
+        //         assert!(
+        //             user.power >= card_metadata.price_xtar as u32,
+        //             "Not enough xtar to mint this card"
+        //         );
+        //     });
+
         if buy_currency == Currency::Terry {
             let amount = card_metadata.price_terry;
-            let withdrawable_amount = config.withdrawable_percentage as i128 * amount / 100;
+            assert!(user.terry >= amount, "Not enough terry to burn");
+            let withdrawable_amount = (config.withdrawable_percentage as i128 * amount) / 100;
             let haw_ai_amount = amount - withdrawable_amount;
-            // burn terry
-            burn_terry(&env, fee_payer.clone(), amount);
-            // mint terry to admin & haw ai pot
+            burn_terry(&env, user.owner.clone(), amount);
             balance.admin_terry += withdrawable_amount;
-            balance.haw_ai_terry += haw_ai_amount;
+            crate::pot::management::accumulate_pot_internal(&env, haw_ai_amount, 0, 0, Some(user.owner.clone()), Some(Action::Mint));
         } else {
             let token = token::Client::new(&env, &config.xtar_token.clone());
             let burnable_amount =
-                (config.burnable_percentage as i128) * card_metadata.price_xtar / 100;
+                (config.burnable_percentage as i128 * card_metadata.price_xtar) / 100;
             let haw_ai_amount = card_metadata.price_xtar - burnable_amount;
-            // 50% of xtar price to burn and 50% to the haw ai pot
             token.burn(&to.clone(), &burnable_amount);
-            token.transfer(&to.clone(), &config.haw_ai_pot, &haw_ai_amount);
+            
+            // Transfer XTAR to contract instead of external address
+            token.transfer(&to.clone(), &env.current_contract_address(), &haw_ai_amount);
+            
+            // Store XTAR in contract vault
+            let mut vault = read_contract_vault(&env);
+            vault.haw_ai_pot_xtar += haw_ai_amount;
+            write_contract_vault(&env, &vault);
+            
             balance.haw_ai_xtar += haw_ai_amount;
+            crate::pot::management::accumulate_pot_internal(&env, 0, 0, haw_ai_amount, Some(user.owner.clone()), Some(Action::Mint));
         };
-
         write_balance(&env, &balance);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, token_id: TokenId) {
         from.require_auth();
         let nft: Card = read_nft(&env, from.clone(), token_id.clone()).unwrap();
+        // Prevent transferring cards locked by an action
+        assert!(nft.locked_by_action == Action::None, "Card is locked by an action");
+        // Update owner-owned card indexes
+        let mut from_cards = read_owner_card(&env, from.clone());
+        if let Some(pos) = from_cards.iter().position(|x| x == token_id.clone()) {
+            from_cards.remove(pos.try_into().unwrap());
+            write_owner_card(&env, from.clone(), from_cards);
+        }
         remove_nft(&env, from.clone(), token_id.clone());
-        write_nft(&env, to, token_id, nft);
+        write_nft(&env, to.clone(), token_id.clone(), nft);
+        let mut to_cards = read_owner_card(&env, to.clone());
+        to_cards.push_back(token_id);
+        write_owner_card(&env, to.clone(), to_cards);
     }
 
-    pub fn burn(env: Env, fee_payer: Address, token_id: TokenId) {
-        burn::burn(env, fee_payer, token_id)
+    pub fn burn(env: Env, user: Address, token_id: TokenId) {
+        burn::burn(env, user, token_id)
     }
 
     pub fn upgrade(e: Env, new_wasm_hash: BytesN<32>) {
         let admin: Address = read_administrator(&e);
         admin.require_auth();
-
         e.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
     pub fn set_admin(e: Env, new_admin: Address) {
         let admin = read_administrator(&e);
         admin.require_auth();
-
         e.storage()
             .instance()
             .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
-
         write_administrator(&e, &new_admin);
         TokenUtils::new(&e).events().set_admin(admin, new_admin);
+    }
+
+    pub fn check_admin(e: Env) -> bool {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+        true
+    }
+
+    pub fn check_admin_address(e: Env) -> Address {
+        let admin = read_administrator(&e);
+        admin.require_auth();
+        admin
     }
 
     pub fn add_level(e: &Env, level: Level) -> u32 {
@@ -236,7 +315,6 @@ impl NFT {
     pub fn add_to_whitelist(e: &Env, members: Vec<Address>) {
         let admin = read_administrator(e);
         admin.require_auth();
-
         for member in members.iter() {
             e.storage()
                 .persistent()
@@ -247,7 +325,6 @@ impl NFT {
     pub fn remove_from_whitelist(e: &Env, members: Vec<Address>) {
         let admin = read_administrator(e);
         admin.require_auth();
-
         for member in members.iter() {
             e.storage()
                 .persistent()
@@ -282,16 +359,12 @@ impl NFT {
     }
 
     pub fn get_card(e: &Env, id: u32) -> CardMetadata {
-        //let key = DataKey::Metadata(TokenId(id));
-        //e.storage().instance().get(&key).unwrap()
         read_metadata(e, id)
     }
 
     pub fn create_user(e: Env, address: Address) {
-        //it should be admin
         let admin = read_administrator(&e);
         admin.require_auth();
-        //
         let user: User = User {
             owner: address.clone(),
             power: 100,
@@ -304,20 +377,15 @@ impl NFT {
 
     pub fn get_all_cards(e: &Env) -> soroban_sdk::Vec<CardMetadata> {
         let mut all_cards = soroban_sdk::Vec::new(&e);
-
-        // Recuperamos todos los identificadores de cartas
         let card_ids = e
             .storage()
             .persistent()
             .get::<DataKey, soroban_sdk::Vec<TokenId>>(&DataKey::AllCardIds)
             .unwrap_or(soroban_sdk::Vec::new(&e));
-
-        // Iteramos sobre cada identificador de carta y recuperamos la metadata
         for token_id in card_ids.iter() {
             let card_metadata = read_metadata(e, token_id.0);
-            all_cards.push_back(card_metadata); // Usamos push_back en lugar de push
+            all_cards.push_back(card_metadata);
         }
-
         all_cards
     }
 
@@ -326,78 +394,419 @@ impl NFT {
         player: Address,
     ) -> soroban_sdk::Vec<(CardMetadata, Card)> {
         let mut player_cards = soroban_sdk::Vec::new(&e);
-
-        // Recuperamos las cartas del jugador
         let owned_card_ids = read_owner_card(e, player.clone());
-
-        // Iteramos sobre las cartas del jugador
         for token_id in owned_card_ids.iter() {
-            let card_metadata = read_metadata(e, token_id.0); // Recupera la metadata
-                                                              // Usamos `if let` para manejar la opción de la carta
+            let card_metadata = read_metadata(e, token_id.0);
             if let Some(card) = read_nft(e, player.clone(), token_id.clone()) {
-                // Si la carta existe, la agregamos
                 player_cards.push_back((card_metadata, card));
             }
         }
-
         player_cards
     }
 
-    pub fn add_power_to_card(e: &Env, player: Address, token_id: u32, amount: u32) {
-        let card = read_nft(e, player.clone(), TokenId(token_id)).unwrap();
-
-        let new_card = Card {
-            power: card.power + amount,
-            locked_by_action: card.locked_by_action,
-        };
-        write_nft(e, player.clone(), TokenId(token_id), new_card);
-
-        let mut user = read_user(e, player.clone());
-
-        user.power = user.power - amount;
-
-        write_user(e, player.clone(), user);
+    pub fn add_power_to_card(env: &Env, player: Address, token_id: u32, amount: u32) {
+        let card = read_nft(env, player.clone(), TokenId(token_id)).unwrap();
+        // Cap power to metadata max
+        let metadata = crate::metadata::read_metadata(env, token_id);
+        let new_power = (card.power as u128 + amount as u128)
+            .min(metadata.max_power as u128) as u32;
+        let new_card = Card { power: new_power, locked_by_action: card.locked_by_action };
+        write_nft(env, player.clone(), TokenId(token_id), new_card);
+        let mut user = read_user(env, player.clone());
+        assert!(user.power >= amount, "Insufficient user POWER");
+        user.power = user.power.checked_sub(amount).expect("POWER underflow");
+        write_user(env, player.clone(), user);
     }
 
-    pub fn read_user(e: &Env, player: Address) -> User {
-        read_user(e, player.clone())
+    pub fn read_user(env: &Env, player: Address) -> User {
+        read_user(env, player.clone())
     }
 }
 
-// Stake
+//Pot Management
+
+#[contractimpl]
+impl NFT {
+    pub fn get_current_pot_state(env: Env) -> (PotBalance, DogstarBalance) {
+        (read_pot_balance(&env), read_dogstar_balance(&env))
+    }
+
+    pub fn get_player_potential_reward(env: Env, player: Address) -> PendingReward {
+        let current_round = get_current_round(&env);
+        let balance = read_pot_balance(&env);
+        let deck = read_deck(env.clone(), player.clone());
+        let players = get_eligible_players(&env);
+        let mut total_effective_power: u128 = 0;
+        for p in players.iter() {
+            let d = read_deck(env.clone(), p.clone());
+            if d.token_ids.len() == 4 {
+                total_effective_power += calculate_effective_power(d.total_power, d.bonus) as u128;
+            }
+        }
+        const PRECISION: u128 = 10000;
+        let effective_power = calculate_effective_power(deck.total_power, deck.bonus) as u128;
+        let share = if total_effective_power > 0 {
+            ((effective_power * PRECISION) / total_effective_power) as u128
+        } else {
+            0
+        };
+        PendingReward {
+            round_number: current_round,
+            terry_amount: (balance.accumulated_terry * share as i128) / PRECISION as i128,
+            power_amount: (balance.accumulated_power as u128 * share / PRECISION) as u32,
+            xtar_amount: (balance.accumulated_xtar * share as i128) / PRECISION as i128,
+            status: RewardStatus::Pending,
+        }
+    }
+
+    pub fn get_historical_snapshot(e: Env, round: u32) -> Option<PotSnapshot> {
+        read_pot_snapshot(&e, round)
+    }
+
+    pub fn get_player_participation(env: Env, player: Address, round: u32) -> Option<PlayerReward> {
+        read_player_reward(&env, round, &player)
+    }
+
+    pub fn get_pending_rewards(env: Env, player: Address) -> Vec<PendingReward> {
+        let mut pending = Vec::new(&env);
+        for round in get_all_rounds(&env).iter() {
+            if let Some(reward) = read_pending_reward(&env, round, &player) {
+                if reward.status != RewardStatus::Claimed {
+                    pending.push_back(reward);
+                }
+            }
+        }
+        pending
+    }
+
+    pub fn accumulate_pot(env: Env, terry: i128, power: u32, xtar: i128, from: Option<Address>, action: Option<Action>) {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        let config = read_config(&env);
+        let mut pot_balance = read_pot_balance(&env);
+        let mut vault = read_contract_vault(&env);
+        
+        let fee_percentage = config.dogstar_fee_percentage;
+        let terry_fee = (terry * fee_percentage as i128) / 10000;
+        let power_fee = (power * fee_percentage) / 10000;
+        let xtar_fee = (xtar * fee_percentage as i128) / 10000;
+        
+        // Accumulate in pot balance (minus dogstar fees)
+        pot_balance.accumulated_terry += terry - terry_fee;
+        pot_balance.accumulated_power += power - power_fee;
+        pot_balance.accumulated_xtar += xtar - xtar_fee;
+        pot_balance.last_updated = env.ledger().timestamp();
+        
+        // Store dogstar fees in vault instead of separate balance
+        vault.dogstar_terry += terry_fee;
+        vault.dogstar_power += power_fee;
+        vault.dogstar_xtar += xtar_fee;
+        
+        write_pot_balance(&env, &pot_balance);
+        write_contract_vault(&env, &vault);
+        
+        // Keep old balance for backward compatibility (can be removed later)
+        let mut dogstar_balance = read_dogstar_balance(&env);
+        dogstar_balance.terry += terry_fee;
+        dogstar_balance.power += power_fee;
+        dogstar_balance.xtar += xtar_fee;
+        write_dogstar_balance(&env, &dogstar_balance);
+        
+        if terry_fee > 0 || power_fee > 0 || xtar_fee > 0 {
+            emit_dogstar_fee_accumulated(&env, terry_fee, power_fee, xtar_fee, fee_percentage, from, action);
+        }
+    }
+
+    pub fn claim_dogstar_fees(env: Env, claimer: Address) {
+        // Restrict to admin only for protocol fee claims
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        assert!(claimer == admin, "Only admin can claim dogstar fees");
+        
+        // Read the claimable balance for dogstar
+        let mut claimable = read_dogstar_claimable(&env);
+        let config = read_config(&env);
+        
+        // Check if there are fees to claim
+        if claimable.terry == 0 && claimable.power == 0 && claimable.xtar == 0 {
+            panic!("No fees available to claim");
+        }
+        
+        let terry_to_claim = claimable.terry;
+        let power_to_claim = claimable.power;
+        let xtar_to_claim = claimable.xtar;
+        
+        // Transfer assets to claimer
+        if terry_to_claim > 0 {
+            let mut user = read_user(&env, claimer.clone());
+            user.terry += terry_to_claim;
+            write_user(&env, claimer.clone(), user);
+            claimable.terry = 0;
+        }
+        
+        if power_to_claim > 0 {
+            let mut user = read_user(&env, claimer.clone());
+            user.power += power_to_claim;
+            write_user(&env, claimer.clone(), user);
+            claimable.power = 0;
+        }
+        
+        if xtar_to_claim > 0 {
+            let token = token::Client::new(&env, &config.xtar_token);
+            token.transfer(&env.current_contract_address(), &claimer, &xtar_to_claim);
+            claimable.xtar = 0;
+        }
+        
+        // Update claim record
+        claimable.last_claim_timestamp = env.ledger().timestamp();
+        claimable.last_claim_round = get_current_round(&env);
+        write_dogstar_claimable(&env, &claimable);
+        
+        // Update vault to reflect claimed amounts
+        let mut vault = read_contract_vault(&env);
+        vault.dogstar_terry -= terry_to_claim;
+        vault.dogstar_power -= power_to_claim;
+        vault.dogstar_xtar -= xtar_to_claim;
+        write_contract_vault(&env, &vault);
+        
+        emit_dogstar_fee_withdrawn(&env, &claimer, terry_to_claim, power_to_claim, xtar_to_claim);
+    }
+    
+    // Admin function to make dogstar fees claimable
+    pub fn release_dogstar_fees(env: Env) {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        
+        let vault = read_contract_vault(&env);
+        let mut claimable = read_dogstar_claimable(&env);
+        
+        // Move fees from vault to claimable
+        claimable.terry += vault.dogstar_terry;
+        claimable.power += vault.dogstar_power;
+        claimable.xtar += vault.dogstar_xtar;
+        
+        write_dogstar_claimable(&env, &claimable);
+        
+        // Note: We don't zero out vault.dogstar_* here to keep track of total accumulated
+        // The claim function will handle the actual deduction
+    }
+
+    pub fn open_pot(env: Env, round: u32) -> Result<(), NFTError> {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        let current_round = get_current_round(&env);
+        if round <= current_round {
+            return Err(NFTError::RoundAlreadyProcessed);
+        }
+        let balance = read_pot_balance(&env);
+        let mut vault = read_contract_vault(&env);
+        
+        // Move pot balance to vault for distribution
+        vault.haw_ai_pot_terry += balance.accumulated_terry;
+        vault.haw_ai_pot_power += balance.accumulated_power;
+        vault.haw_ai_pot_xtar += balance.accumulated_xtar;
+        vault.total_claimable_terry += balance.accumulated_terry;
+        vault.total_claimable_power += balance.accumulated_power;
+        vault.total_claimable_xtar += balance.accumulated_xtar;
+        write_contract_vault(&env, &vault);
+        
+        let snapshot = PotSnapshot {
+            round_number: round,
+            total_terry: balance.accumulated_terry,
+            total_power: balance.accumulated_power,
+            total_xtar: balance.accumulated_xtar,
+            timestamp: env.ledger().timestamp(),
+            total_participants: 0,
+            total_effective_power: 0,
+        };
+        write_pot_snapshot(&env, round, &snapshot);
+        emit_pot_opened(&env, round, &snapshot);
+        
+        // Calculate and store player shares as claimable balances
+        Self::calculate_and_store_claimable_shares(&env, round, &snapshot);
+        
+        set_current_round(&env, round);
+        add_round(&env, round);
+        write_pot_balance(
+            &env,
+            &PotBalance {
+                accumulated_terry: 0,
+                accumulated_power: 0,
+                accumulated_xtar: 0,
+                last_opening_round: round,
+                total_openings: balance.total_openings + 1,
+                last_updated: env.ledger().timestamp(),
+            },
+        );
+
+        Ok(())
+    }
+    
+    fn calculate_and_store_claimable_shares(env: &Env, round: u32, snapshot: &PotSnapshot) {
+        calculate_player_shares(env, round);
+        
+        // Get all participants for this round
+        let decks = read_decks(env.clone());
+        
+        for deck in decks.iter() {
+            if let Some(player_reward) = read_player_reward(env, round, &deck.owner) {
+                // Calculate share based on effective power
+                let share_percentage = player_reward.share_percentage;
+                
+                let terry_share = (snapshot.total_terry * share_percentage as i128) / 10000;
+                let power_share = (snapshot.total_power * share_percentage) / 10000;
+                let xtar_share = (snapshot.total_xtar * share_percentage as i128) / 10000;
+                
+                // Update user's claimable balance
+                let mut user_claimable = read_user_claimable_balance(env, &deck.owner);
+                user_claimable.terry += terry_share;
+                user_claimable.power += power_share;
+                user_claimable.xtar += xtar_share;
+                user_claimable.last_claim_round = round;
+                write_user_claimable_balance(env, &deck.owner, &user_claimable);
+            }
+        }
+    }
+
+    pub fn claim_haw_ai_pot_share(env: Env, player: Address) -> Result<(i128, u32, i128), NFTError> {
+        player.require_auth();
+
+        let mut claimable = read_user_claimable_balance(&env, &player);
+        let config = read_config(&env);
+
+        if claimable.terry == 0 && claimable.power == 0 && claimable.xtar == 0 {
+            return Err(NFTError::NoRewardsAvailable);
+        }
+        
+        let terry_to_claim = claimable.terry;
+        let power_to_claim = claimable.power;
+        let xtar_to_claim = claimable.xtar;
+        
+        // Transfer assets to player
+        if terry_to_claim > 0 {
+            mint_terry(&env, player.clone(), terry_to_claim);
+            claimable.terry = 0;
+        }
+        
+        if power_to_claim > 0 {
+            let mut user = read_user(&env, player.clone());
+            user.power += power_to_claim;
+            write_user(&env, player.clone(), user);
+            claimable.power = 0;
+        }
+        
+        if xtar_to_claim > 0 {
+            let token = token::Client::new(&env, &config.xtar_token);
+            token.transfer(&env.current_contract_address(), &player, &xtar_to_claim);
+            claimable.xtar = 0;
+        }
+        
+        // Update claim record
+        claimable.last_claim_timestamp = env.ledger().timestamp();
+        write_user_claimable_balance(&env, &player, &claimable);
+        
+        // Update vault to reflect claimed amounts
+        let mut vault = read_contract_vault(&env);
+        vault.total_claimable_terry -= terry_to_claim;
+        vault.total_claimable_power -= power_to_claim;
+        vault.total_claimable_xtar -= xtar_to_claim;
+        write_contract_vault(&env, &vault);
+        
+        // Emit event
+        emit_rewards_claimed(&env, &player, terry_to_claim, power_to_claim, xtar_to_claim);
+
+        Ok((terry_to_claim, power_to_claim, xtar_to_claim))
+    }
+    
+    pub fn view_claimable_balance(env: Env, player: Address) -> UserClaimableBalance {
+        read_user_claimable_balance(&env, &player)
+    }
+    
+    pub fn view_vault_status(env: Env) -> ContractVault {
+        read_contract_vault(&env)
+    }
+    
+    pub fn claim_all_pending_rewards(env: Env, player: Address) -> Result<(i128, u32, i128), NFTError> {
+        // Legacy function - redirect to new claim function
+        Self::claim_haw_ai_pot_share(env, player)
+    }
+
+    pub fn update_dogstar_fee_percentage(env: Env, fee_percentage: u32) {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        
+        // Maximum fee percentage (50% = 5000 basis points)
+        const MAX_FEE_PERCENTAGE: u32 = 5000;
+        assert!(fee_percentage <= MAX_FEE_PERCENTAGE, "Fee percentage exceeds maximum (50%)");
+
+        let mut config = read_config(&env);
+        let old_fee = config.dogstar_fee_percentage;
+        config.dogstar_fee_percentage = fee_percentage;
+        write_config(&env, &config);
+        emit_dogstar_fee_percentage_updated(&env, old_fee, fee_percentage);
+    }
+
+    pub fn contribute_to_pot(env: Env, terry: i128, power: u32, xtar: i128) {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        assert!(
+            terry >= 0 && xtar >= 0,
+            "Negative contributions not allowed"
+        );
+        Self::accumulate_pot(env, terry, power, xtar, None, None);
+    }
+
+    pub fn get_eligible_players(env: Env) -> Vec<Address> {
+        get_eligible_players(&env)
+    }
+
+    pub fn get_eligible_players_with_shares(env: Env) -> Vec<(Address, u32, u32, u32)> {
+        get_eligible_players_with_shares(&env)
+    }
+
+    pub fn get_all_rounds(env: Env) -> Vec<u32> {
+        get_all_rounds(&env)
+    }
+
+    pub fn get_current_round(env: Env) -> u32 {
+        get_current_round(&env)
+    }
+}
+
+// Stake, Fight, Lend & Borrow, Deck sections unchanged
 #[contractimpl]
 impl NFT {
     pub fn stake(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
         period_index: u32,
     ) {
-        stake::stake(env, fee_payer, category, token_id, period_index)
+        stake::stake(env, user, category, token_id, period_index)
     }
 
     pub fn increase_stake_power(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
         increase_power: u32,
     ) {
-        stake::increase_stake_power(env, fee_payer, category, token_id, increase_power)
+        stake::increase_stake_power(env, user, category, token_id, increase_power)
     }
 
-    pub fn unstake(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-        stake::unstake(env, fee_payer, category, token_id)
+    pub fn unstake(env: Env, user: Address, category: Category, token_id: TokenId) {
+        stake::unstake(env, user, category, token_id)
     }
 
     pub fn read_stake(
         env: &Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
     ) -> stake::Stake {
-        stake::read_stake(env, fee_payer, category, token_id)
+        stake::read_stake(env, user, category, token_id)
     }
 
     pub fn read_stakes(env: Env) -> Vec<stake::Stake> {
@@ -405,7 +814,6 @@ impl NFT {
     }
 }
 
-// Fight
 #[contractimpl]
 impl NFT {
     pub fn open_position(
@@ -437,25 +845,25 @@ impl NFT {
     pub fn currency_price(env: Env, oracle_contract_id: Address) -> i128 {
         fight::get_currency_price(env, oracle_contract_id, fight::FightCurrency::BTC)
     }
+
     pub fn read_fight(
         env: Env,
-        fee_payer: Address,
+        user: Address,
         category: Category,
         token_id: TokenId,
     ) -> fight::Fight {
-        fight::read_fight(env, fee_payer, category, token_id)
+        fight::read_fight(env, user, category, token_id)
     }
 
     pub fn read_fights(env: Env) -> Vec<fight::Fight> {
         fight::read_fights(env)
     }
-    pub fn check_liquidation(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-        fight::check_liquidation(env, fee_payer, category, token_id)
+
+    pub fn check_liquidation(env: Env, liquidator: Address, user: Address, category: Category, token_id: TokenId) {
+        fight::check_liquidation(env, liquidator, user, category, token_id)
     }
-    
 }
 
-// Lend & Borrow
 #[contractimpl]
 impl NFT {
     pub fn lend(env: Env, lender: Address, category: Category, token_id: TokenId, power: u32) {
@@ -473,9 +881,11 @@ impl NFT {
     pub fn withdraw(env: Env, lender: Address, category: Category, token_id: TokenId) {
         lending::withdraw(env, lender, category, token_id)
     }
+
     pub fn get_current_apy(env: Env) -> u64 {
         lending::get_current_apy(env)
     }
+
     pub fn read_lending(
         env: Env,
         player: Address,
@@ -484,23 +894,26 @@ impl NFT {
     ) -> lending::Lending {
         lending::read_lending(env, player, category, token_id)
     }
+
     pub fn read_borrowing(
         env: Env,
         player: Address,
         category: Category,
         token_id: TokenId,
     ) -> lending::Borrowing {
+        player.require_auth();
         lending::read_borrowing(env, player, category, token_id)
     }
+
     pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
         lending::read_borrowings(env)
     }
+
     pub fn read_lendings(env: Env) -> Vec<Lending> {
         lending::read_lendings(env)
     }
 }
 
-// Deck
 #[contractimpl]
 impl NFT {
     pub fn place(env: Env, owner: Address, token_id: TokenId) {
@@ -510,14 +923,6 @@ impl NFT {
     pub fn replace(env: Env, owner: Address, prev_token_id: TokenId, token_id: TokenId) {
         deck::replace(env, owner, prev_token_id, token_id);
     }
-    // pub fn update_place(
-    //     env: Env,
-    //     owner: Address,
-    //     categories: Vec<Category>,
-    //     token_ids: Vec<TokenId>,
-    // ) {
-    //     deck::update_place(env, owner, categories, token_ids)
-    // }
 
     pub fn remove_place(env: Env, owner: Address, token_id: TokenId) {
         deck::remove_place(env, owner, token_id)

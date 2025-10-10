@@ -5,7 +5,7 @@ use crate::{
 };
 use admin::{read_balance, read_config, write_balance};
 use nft_info::{read_nft, write_nft, Action, Category};
-use soroban_sdk::{contracttype, vec, Address, Env, Vec, symbol_short};
+use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
 
@@ -35,12 +35,12 @@ pub struct Borrowing {
 
 pub fn write_lending(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     lending: Lending,
 ) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &lending);
@@ -65,13 +65,8 @@ pub fn write_lending(
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 }
 
-pub fn read_lending(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-) -> Lending {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_lending(env: Env, user: Address, category: Category, token_id: TokenId) -> Lending {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -80,8 +75,8 @@ pub fn read_lending(
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_lending(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer).owner;
+pub fn remove_lending(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Lending(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().remove(&key);
@@ -118,12 +113,12 @@ pub fn read_lendings(env: Env) -> Vec<Lending> {
 
 pub fn write_borrowing(
     env: Env,
-    fee_payer: Address,
+    user: Address,
     category: Category,
     token_id: TokenId,
     borrowing: Borrowing,
 ) {
-    let owner = read_user(&env, fee_payer).owner;
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage().persistent().set(&key, &borrowing);
@@ -148,17 +143,15 @@ pub fn write_borrowing(
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-    env.events().publish((symbol_short!("borrowing"), symbol_short!("open")), borrowing);
+    env.events().publish(
+        (symbol_short!("borrowing"), symbol_short!("open")),
+        borrowing,
+    );
 }
 
-pub fn read_borrowing(
-    env: Env,
-    fee_payer: Address,
-    category: Category,
-    token_id: TokenId,
-) -> Borrowing {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
+pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) -> Borrowing {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
     env.storage()
@@ -167,18 +160,18 @@ pub fn read_borrowing(
     env.storage().persistent().get(&key).unwrap()
 }
 
-pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    let owner = read_user(&env, fee_payer.clone()).owner;
+pub fn remove_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) {
+    let owner = read_user(&env, user.clone()).owner;
 
-    let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
-    env.storage().persistent().remove(&key);
-    if env.storage().persistent().has(&key) {
-        env.storage().persistent().extend_ttl(
-            &key,
-            BALANCE_LIFETIME_THRESHOLD,
-            BALANCE_BUMP_AMOUNT,
-        );
-    }
+    // let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
+    // env.storage().persistent().remove(&key);
+    // if env.storage().persistent().has(&key) {
+    //     env.storage().persistent().extend_ttl(
+    //         &key,
+    //         BALANCE_LIFETIME_THRESHOLD,
+    //         BALANCE_BUMP_AMOUNT,
+    //     );
+    // }
 
     let key = DataKey::Borrowings;
     let mut borrowings = read_borrowings(env.clone());
@@ -187,8 +180,16 @@ pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_
             && borrowing.category == category
             && borrowing.token_id == token_id
     }) {
-        let borrowing = read_borrowing(env.clone(), fee_payer.clone(), category.clone(), token_id.clone());
-        env.events().publish((symbol_short!("borrowing"), symbol_short!("close")), borrowing.clone());
+        let borrowing = read_borrowing(
+            env.clone(),
+            user.clone(),
+            category.clone(),
+            token_id.clone(),
+        );
+        env.events().publish(
+            (symbol_short!("borrowing"), symbol_short!("close")),
+            borrowing.clone(),
+        );
         borrowings.remove(pos.try_into().unwrap());
     }
 
@@ -197,6 +198,9 @@ pub fn remove_borrowing(env: Env, fee_payer: Address, category: Category, token_
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
+    let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
+    env.storage().persistent().remove(&key);
 }
 
 pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
@@ -232,10 +236,12 @@ fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
     principal * apy * loan_duration / 8_760 / SCALE
 }
 
-pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
-    fee_payer.require_auth();
-    let owner = read_user(&env, fee_payer).owner;
-
+pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
+    user.require_auth();
+    let owner = read_user(&env, user).owner;
+    let config = read_config(&env);
+    let power_fee: u32 = power.saturating_mul(config.power_action_fee) / 100;
+    let lend_amount: u32 = power.saturating_sub(power_fee);
     assert!(
         category == Category::Resource || category == Category::Leader,
         "Invalid Category to lend"
@@ -252,15 +258,13 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
 
     write_nft(&env.clone(), owner.clone(), token_id.clone(), nft);
 
-    let config = read_config(&env);
     let mut balance = read_balance(&env);
 
-    let power_fee = power * config.power_action_fee / 100;
     balance.haw_ai_power += power_fee;
 
     let mut state = read_state(&env);
 
-    state.total_offer += power as u64;
+    state.total_offer += lend_amount as u64;
 
     write_state(&env, &state);
 
@@ -268,7 +272,7 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
         lender: owner.clone(),
         category: category.clone(),
         token_id: token_id.clone(),
-        power,
+        power: lend_amount,
         lent_at: env.ledger().timestamp(),
     };
 
@@ -287,10 +291,13 @@ pub fn lend(env: Env, fee_payer: Address, category: Category, token_id: TokenId,
     write_balance(&env, &balance);
 }
 
-pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenId, power: u32) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer.clone());
+pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
+    user.require_auth();
+    let mut user = read_user(&env, user.clone());
     let owner = user.owner.clone();
+    let config = read_config(&env);
+    let power_fee: u32 = power.saturating_mul(config.power_action_fee) / 100;
+    let borrow_amount: u32 = power.saturating_sub(power_fee);
 
     assert!(
         category == Category::Resource || category == Category::Leader,
@@ -303,7 +310,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         "Card is locked by another action"
     );
 
-    let config = read_config(&env);
+    // config already read above
 
     let mut state = read_state(&env);
     assert!(
@@ -312,7 +319,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     );
 
     state.total_offer -= power as u64;
-    state.total_borrowed_power += power as u64;
+    state.total_borrowed_power += borrow_amount as u64;
 
     write_state(&env, &state);
 
@@ -332,10 +339,10 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
 
     let mut balance = read_balance(&env);
 
-    let power_fee = power * config.power_action_fee / 100;
+
     balance.haw_ai_power += power_fee;
 
-    user.power += power;
+    user.power += borrow_amount;
 
     write_user(&env.clone(), owner.clone(), user);
 
@@ -343,7 +350,7 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
         borrower: owner.clone(),
         category: category.clone(),
         token_id: token_id.clone(),
-        power: power.clone(),
+        power: borrow_amount,
         borrowed_at: env.ledger().timestamp(),
     };
 
@@ -362,9 +369,9 @@ pub fn borrow(env: Env, fee_payer: Address, category: Category, token_id: TokenI
     write_balance(&env, &balance);
 }
 
-pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer);
+pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let mut user = read_user(&env, user);
     let owner = user.owner.clone();
 
     assert!(
@@ -414,7 +421,7 @@ pub fn repay(env: Env, fee_payer: Address, category: Category, token_id: TokenId
 
     assert!(
         user.power >= borrowing.power + interest_amount as u32,
-        "Insufficient fund to repay",
+        "Insufficient fund to repay"
     );
 
     user.power -= borrowing.power + interest_amount as u32;
@@ -462,9 +469,9 @@ fn check_liquidations(env: Env) {
     }
 }
 
-fn liquidate(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let user = read_user(&env, fee_payer);
+fn liquidate(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let user = read_user(&env, user);
     let owner = user.owner.clone();
 
     let borrowing = read_borrowing(
@@ -502,9 +509,9 @@ fn liquidate(env: Env, fee_payer: Address, category: Category, token_id: TokenId
     }
 }
 
-pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: TokenId) {
-    fee_payer.require_auth();
-    let mut user = read_user(&env, fee_payer);
+pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) {
+    user.require_auth();
+    let mut user = read_user(&env, user);
     let owner = user.owner.clone();
 
     assert!(
@@ -545,7 +552,11 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     state = read_state(&env);
 
-    state.total_interest -= interest_amount;
+    if state.total_interest >= interest_amount {
+      state.total_interest -= interest_amount;
+    } else {
+        state.total_interest = 0;
+    }
     state.total_offer -= lending.power as u64;
 
     write_state(&env, &state);
@@ -554,7 +565,10 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
-    user.power += interest_amount as u32;
+    power_fee = interest_amount.saturating_mul(config.power_action_fee) / 100;
+    reward_interest = interest_amount.saturating_sub(power_fee)
+
+    user.power += reward_interest as u32;
 
     write_user(&env, owner.clone(), user);
 
@@ -565,6 +579,7 @@ pub fn withdraw(env: Env, fee_payer: Address, category: Category, token_id: Toke
     mint_terry(&env, owner.clone(), config.terry_per_lending);
 
     let mut balance = read_balance(&env);
+    balance.haw_ai_power += power_fee;
     balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
     write_balance(&env, &balance);
 }

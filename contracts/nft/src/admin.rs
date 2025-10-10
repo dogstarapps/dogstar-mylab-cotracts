@@ -1,50 +1,5 @@
-use crate::storage_types::{DataKey, Level};
-use soroban_sdk::{contracttype, Address, Env, Vec, symbol_short};
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Config {
-    pub xtar_token: Address,
-    pub oracle_contract_id: Address,
-    pub haw_ai_pot: Address,
-    pub withdrawable_percentage: u32,
-    pub burnable_percentage: u32,
-    pub haw_ai_percentage: u32,
-    pub terry_per_power: i128,
-    pub stake_periods: Vec<u32>,
-    pub stake_interest_percentages: Vec<u32>,
-    pub power_action_fee: u32,
-    pub burn_receive_percentage: u32,
-    pub terry_per_deck: i128,
-    pub terry_per_fight: i128,
-    pub terry_per_lending: i128,
-    pub terry_per_stake: i128,
-    pub apy_alpha: u32,
-    pub power_to_usdc_rate: i128, // e.g., 1000 for 0.10 USDC per POWER (1000/10000 = 0.10)
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Balance {
-    pub admin_terry: i128,
-    pub admin_power: u32,
-    pub haw_ai_terry: i128,
-    pub haw_ai_power: u32,
-    pub haw_ai_xtar: i128,
-    pub total_deck_power: u32,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct State {
-    pub total_offer: u64,
-    pub total_demand: u64,
-    pub total_interest: u64,
-    pub total_loan_duration: u64,
-    pub total_loan_count: u64,
-    pub total_staked_power: u64,
-    pub total_borrowed_power: u64,
-}
+use crate::storage_types::*;
+use soroban_sdk::{symbol_short, Address, Env};
 
 pub fn has_administrator(e: &Env) -> bool {
     let key = DataKey::Admin;
@@ -56,9 +11,9 @@ pub fn read_administrator(e: &Env) -> Address {
     e.storage().instance().get(&key).unwrap()
 }
 
-pub fn write_administrator(e: &Env, id: &Address) {
+pub fn write_administrator(env: &Env, id: &Address) {
     let key = DataKey::Admin;
-    e.storage().instance().set(&key, id);
+    env.storage().instance().set(&key, id);
 }
 
 pub fn is_whitelisted(e: &Env, member: &Address) -> bool {
@@ -79,6 +34,7 @@ pub fn read_config(e: &Env) -> Config {
 }
 
 pub fn write_balance(e: &Env, balance: &Balance) {
+    // Balance(u32) to track the different tokens balance???
     let key = DataKey::Balance;
     e.storage().persistent().set(&key, balance);
 }
@@ -99,10 +55,7 @@ pub fn write_state(e: &Env, state: &State) {
     let key = DataKey::State;
     e.storage().persistent().set(&key, state);
 
-    e.events().publish(
-        (symbol_short!("state"),),
-        state.clone(),
-    );
+    e.events().publish((symbol_short!("state"),), state.clone());
 }
 
 pub fn read_state(e: &Env) -> State {
@@ -119,7 +72,7 @@ pub fn read_state(e: &Env) -> State {
 }
 
 pub fn add_level(e: &Env, level: Level) -> u32 {
-    let level_id = get_and_inc_level_id(&e);
+    let level_id = get_and_increase_level_id(&e);
     e.storage()
         .persistent()
         .set(&DataKey::Level(level_id), &level);
@@ -133,7 +86,7 @@ pub fn update_level(e: &Env, level_id: u32, level: Level) {
         .set(&DataKey::Level(level_id), &level);
 }
 
-pub fn get_and_inc_level_id(env: &Env) -> u32 {
+pub fn get_and_increase_level_id(env: &Env) -> u32 {
     let prev = env
         .storage()
         .persistent()
@@ -144,4 +97,57 @@ pub fn get_and_inc_level_id(env: &Env) -> u32 {
         .persistent()
         .set(&DataKey::LevelId, &(prev + 1));
     prev + 1
+}
+
+// Vault management functions
+pub fn write_contract_vault(e: &Env, vault: &ContractVault) {
+    let key = DataKey::ContractVault;
+    e.storage().persistent().set(&key, vault);
+}
+
+pub fn read_contract_vault(e: &Env) -> ContractVault {
+    let key = DataKey::ContractVault;
+    e.storage().persistent().get(&key).unwrap_or(ContractVault {
+        haw_ai_pot_terry: 0,
+        haw_ai_pot_power: 0,
+        haw_ai_pot_xtar: 0,
+        dogstar_terry: 0,
+        dogstar_power: 0,
+        dogstar_xtar: 0,
+        total_claimable_terry: 0,
+        total_claimable_power: 0,
+        total_claimable_xtar: 0,
+    })
+}
+
+pub fn write_user_claimable_balance(e: &Env, user: &Address, balance: &UserClaimableBalance) {
+    let key = DataKey::UserClaimableBalance(user.clone());
+    e.storage().persistent().set(&key, balance);
+}
+
+pub fn read_user_claimable_balance(e: &Env, user: &Address) -> UserClaimableBalance {
+    let key = DataKey::UserClaimableBalance(user.clone());
+    e.storage().persistent().get(&key).unwrap_or(UserClaimableBalance {
+        terry: 0,
+        power: 0,
+        xtar: 0,
+        last_claim_round: 0,
+        last_claim_timestamp: 0,
+    })
+}
+
+pub fn write_dogstar_claimable(e: &Env, balance: &UserClaimableBalance) {
+    let key = DataKey::DogstarClaimableBalance;
+    e.storage().persistent().set(&key, balance);
+}
+
+pub fn read_dogstar_claimable(e: &Env) -> UserClaimableBalance {
+    let key = DataKey::DogstarClaimableBalance;
+    e.storage().persistent().get(&key).unwrap_or(UserClaimableBalance {
+        terry: 0,
+        power: 0,
+        xtar: 0,
+        last_claim_round: 0,
+        last_claim_timestamp: 0,
+    })
 }
