@@ -5,6 +5,7 @@ use nft_info::{read_nft, write_nft, Action};
 use soroban_sdk::{log, vec, Address, Env, Vec};
 use storage_types::{DataKey, Deck, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
+use crate::event::{emit_deck_place, emit_deck_replace, emit_deck_remove, emit_deck_completed};
 
 fn write_deck(env: Env, user: Address, deck: Deck) {
     let owner = read_user(&env, user).owner;
@@ -114,10 +115,15 @@ pub fn place(env: Env, user: Address, token_id: TokenId) {
     write_nft(&env, user.clone(), token_id.clone(), nft.clone());
     deck.token_ids.push_back(token_id.clone());
 
+    let deck_size = deck.token_ids.len();
+
     if deck.token_ids.len() == 4 {
         calculate_deck_balance(env.clone(), user.clone(), &mut deck);
     }
     write_deck(env.clone(), user.clone(), deck);
+
+    // Emit deck place event
+    emit_deck_place(&env, &user);
 
     let config = read_config(&env);
     mint_terry(&env, user.clone(), config.terry_per_deck);
@@ -158,6 +164,9 @@ pub fn replace(env: Env, user: Address, prev_token_id: TokenId, token_id: TokenI
         calculate_deck_balance(env.clone(), user.clone(), &mut deck);
     }
     write_deck(env.clone(), user.clone(), deck);
+
+    // Emit deck replace event
+    emit_deck_replace(&env, &user);
 
     nft.locked_by_action = Action::Deck;
     write_nft(&env, user.clone(), token_id.clone(), nft);
@@ -205,8 +214,13 @@ pub fn remove_place(env: Env, user: Address, token_id: TokenId) {
     deck.bonus = 0;
     deck.deck_categories = 0;
 
+    let deck_size = deck.token_ids.len();
+
     write_deck(env.clone(), user.clone(), deck);
     update_haw_ai_percentages(env.clone());
+
+    // Emit deck remove event
+    emit_deck_remove(&env, &user);
 
     let config = read_config(&env);
     mint_terry(&env, user.clone(), config.terry_per_deck);
@@ -234,7 +248,7 @@ pub fn calculate_deck_balance(env: Env, player_address: Address, deck: &mut Deck
         let bonus = match deck_categories {
             2 => 5,
             3 => 10,
-            4 => 20,
+            4 => 25,
             _ => 0,
         };
 
@@ -246,6 +260,9 @@ pub fn calculate_deck_balance(env: Env, player_address: Address, deck: &mut Deck
         deck.bonus = bonus;
         deck.total_power = total_power;
         deck.deck_categories = deck_categories;
+
+        // Emit deck completed event
+        emit_deck_completed(&env, &player_address);
 
         update_haw_ai_percentages(env.clone());
     }

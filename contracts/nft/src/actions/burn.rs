@@ -5,6 +5,7 @@ use nft_info::{read_nft, remove_nft, Action};
 use soroban_sdk::{Address, Env};
 use storage_types::TokenId;
 use user_info::{read_owner_card, read_user, write_owner_card, write_user};
+use crate::event::emit_burn;
 
 pub fn burn(env: Env, user: Address, token_id: TokenId) {
     user.require_auth();
@@ -29,6 +30,9 @@ pub fn burn(env: Env, user: Address, token_id: TokenId) {
     mint_terry(&env, owner.clone(), receive_amount);
     // Accumulate to pot with Dogstar fee deduction (internal helper, no admin auth)
     crate::pot::management::accumulate_pot_internal(&env, pot_terry, pot_power as u32, 0, Some(owner.clone()), Some(Action::Burn));
+
+    // Emit burn event
+    emit_burn(&env, &owner);
 
     // Remove card and NFT
     remove_owner_card(&env, owner.clone(), token_id.clone());

@@ -4,6 +4,7 @@ use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::read_user;
+use crate::event::{emit_stake, emit_stake_increased, emit_unstake};
 
 #[contracttype]
 #[derive(Clone, PartialEq)]
@@ -127,18 +128,21 @@ pub fn stake(env: Env, user: Address, category: Category, token_id: TokenId, per
 
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
+    let stake_period = config.stake_periods.get(period_index).unwrap();
+    let stake_interest = config.stake_interest_percentages.get(period_index).unwrap();
+
     write_stake(
         &env,
         owner.clone(),
         category.clone(),
         token_id.clone(),
         Stake {
-            owner,
+            owner: owner.clone(),
             category,
-            token_id,
+            token_id: token_id.clone(),
             power: staked_power,
-            period: config.stake_periods.get(period_index).unwrap(),
-            interest_percentage: config.stake_interest_percentages.get(period_index).unwrap(),
+            period: stake_period,
+            interest_percentage: stake_interest,
             staked_time: env
                 .ledger()
                 .timestamp()
@@ -146,6 +150,9 @@ pub fn stake(env: Env, user: Address, category: Category, token_id: TokenId, per
                 .expect("Timestamp exceeds u32 limit"),
         },
     );
+
+    // Emit stake event
+    emit_stake(&env, &owner);
 
     let mut state = read_state(&env);
     state.total_staked_power += staked_power as u64;
@@ -193,6 +200,7 @@ pub fn increase_stake_power(
 
     let mut balance = read_balance(&env);
     balance.haw_ai_power += power_fee;
+    write_balance(&env, &balance);
 
     write_stake(
         &env,
@@ -201,6 +209,9 @@ pub fn increase_stake_power(
         token_id.clone(),
         stake,
     );
+
+    // Emit stake increased event
+    emit_stake_increased(&env, &owner);
 
     // Mint terry to user as rewards
     mint_terry(&env, owner, config.terry_per_stake);
@@ -231,6 +242,7 @@ pub fn unstake(env: Env, user: Address, category: Category, token_id: TokenId) {
     }
 
     let interest_amount = stake.power * stake.interest_percentage / 100;
+    let staked_power = stake.power;
     nft.power += stake.power + interest_amount;
     nft.locked_by_action = Action::None;
 
@@ -240,6 +252,9 @@ pub fn unstake(env: Env, user: Address, category: Category, token_id: TokenId) {
     let terry_amount = config.terry_per_power * interest_amount as i128;
 
     mint_terry(&env, owner.clone(), terry_amount);
+
+    // Emit unstake event
+    emit_unstake(&env, &owner);
 
     remove_stake(&env, owner.clone(), category.clone(), token_id.clone());
 

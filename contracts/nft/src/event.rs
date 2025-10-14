@@ -101,3 +101,115 @@ pub fn emit_rewards_claimed(e: &Env, player: &Address, terry: i128, power: u32, 
         (terry, power, xtar),
     );
 }
+
+/// Emits an event when a card is burned.
+pub fn emit_burn(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("burn"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is staked.
+pub fn emit_stake(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("stake"), symbol_short!("open"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when stake power is increased.
+pub fn emit_stake_increased(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("stake"), symbol_short!("increase"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is unstaked.
+pub fn emit_unstake(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("stake"), symbol_short!("close"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is lent.
+pub fn emit_lend(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("lend"), symbol_short!("open"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when lending is withdrawn.
+pub fn emit_withdraw(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("lend"), symbol_short!("close"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when borrowing is made.
+pub fn emit_borrow(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("borrow"), symbol_short!("open"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when repayment is made.
+pub fn emit_repay(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("borrow"), symbol_short!("close"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is placed in a deck.
+pub fn emit_deck_place(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("deck"), symbol_short!("place"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is replaced in a deck.
+pub fn emit_deck_replace(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("deck"), symbol_short!("replace"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is removed from a deck.
+pub fn emit_deck_remove(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("deck"), symbol_short!("remove"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a deck is completed (4 cards).
+pub fn emit_deck_completed(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("deck"), symbol_short!("complete"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is minted.
+pub fn emit_mint(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("mint"), player.clone()),
+        (),
+    );
+}
+
+/// Emits an event when a card is transferred.
+pub fn emit_transfer(env: &Env, from: &Address, to: &Address) {
+    env.events().publish(
+        (symbol_short!("transfer"), from.clone(), to.clone()),
+        (),
+    );
+}
