@@ -176,7 +176,6 @@ pub fn check_liquidation(
 ) {
     // Require authorization from liquidator (can be anyone, but must be authenticated)
     liquidator.require_auth();
-    
     let fight = read_fight(
         env.clone(),
         user.clone(),
@@ -189,26 +188,32 @@ pub fn check_liquidation(
         config.oracle_contract_id,
         fight.currency.clone(),
     );
-    
     // Validate oracle price is recent and reasonable
     assert!(current_price > 0, "Invalid oracle price");
     assert!(current_price < i128::MAX / 2, "Oracle price too high");
-    
     let liq_price = get_liquidation_price(&fight);
     let is_liquidated = match fight.side_position {
         SidePosition::Long => current_price <= liq_price,
         SidePosition::Short => current_price >= liq_price,
     };
-    
     // Only allow liquidation if position is actually underwater
     assert!(is_liquidated, "Position is not liquidatable");
-    
     if is_liquidated {
         let mut nft = read_nft(&env, user.clone(), token_id.clone()).unwrap();
-        nft.power = 0;
-        remove_owner_card(&env, user.clone(), token_id.clone());
-        remove_nft(&env, user.clone(), token_id.clone());
-        remove_fight(env, user, category, token_id);
+        // Mint TERRY rewards to user
+        let terry_reward = config.terry_per_fight;
+        mint_terry(&env, user.clone(), terry_reward);
+
+        // Handle NFT based on final power
+        if nft.power > 0 {
+            nft.locked_by_action = Action::None;
+            write_nft(&env, user.clone(), token_id.clone(), nft);
+        } else {
+            remove_owner_card(&env, user.clone(), token_id.clone());
+            remove_nft(&env, user.clone(), token_id.clone());
+        }
+        // Remove fight position
+        remove_fight(env.clone(), user.clone(), category.clone(), token_id);
     }
 }
 
