@@ -256,6 +256,9 @@ impl NFT {
             crate::pot::management::accumulate_pot_internal(&env, 0, 0, haw_ai_amount, Some(user.owner.clone()), Some(Action::Mint));
         };
         write_balance(&env, &balance);
+
+        // Emit mint event
+        emit_mint(&env, &to);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, token_id: TokenId) {
@@ -274,6 +277,9 @@ impl NFT {
         let mut to_cards = read_owner_card(&env, to.clone());
         to_cards.push_back(token_id);
         write_owner_card(&env, to.clone(), to_cards);
+
+        // Emit transfer event
+        emit_transfer(&env, &from, &to);
     }
 
     pub fn burn(env: Env, user: Address, token_id: TokenId) {

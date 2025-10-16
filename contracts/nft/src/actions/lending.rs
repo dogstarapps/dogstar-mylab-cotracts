@@ -8,6 +8,7 @@ use nft_info::{read_nft, write_nft, Action, Category};
 use soroban_sdk::{contracttype, symbol_short, vec, Address, Env, Vec};
 use storage_types::{DataKey, TokenId, BALANCE_BUMP_AMOUNT, BALANCE_LIFETIME_THRESHOLD};
 use user_info::{read_user, write_user};
+use crate::event::{emit_lend, emit_borrow, emit_withdraw, emit_repay};
 
 const SCALE: u64 = 1_000_000; // 6-decimal fixed point
 const APY_MIN: u64 = 0; // 0% APY
@@ -143,10 +144,6 @@ pub fn write_borrowing(
     env.storage()
         .persistent()
         .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
-    env.events().publish(
-        (symbol_short!("borrowing"), symbol_short!("open")),
-        borrowing,
-    );
 }
 
 pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) -> Borrowing {
@@ -180,16 +177,6 @@ pub fn remove_borrowing(env: Env, user: Address, category: Category, token_id: T
             && borrowing.category == category
             && borrowing.token_id == token_id
     }) {
-        let borrowing = read_borrowing(
-            env.clone(),
-            user.clone(),
-            category.clone(),
-            token_id.clone(),
-        );
-        env.events().publish(
-            (symbol_short!("borrowing"), symbol_short!("close")),
-            borrowing.clone(),
-        );
         borrowings.remove(pos.try_into().unwrap());
     }
 
@@ -268,12 +255,13 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
 
     write_state(&env, &state);
 
+    let lent_at = env.ledger().timestamp();
     let lending = Lending {
         lender: owner.clone(),
         category: category.clone(),
         token_id: token_id.clone(),
         power: lend_amount,
-        lent_at: env.ledger().timestamp(),
+        lent_at,
     };
 
     write_lending(
@@ -283,6 +271,9 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
         token_id.clone(),
         lending,
     );
+
+    // Emit lend event
+    emit_lend(&env, &owner);
 
     // Mint terry to user as rewards
     mint_terry(&env, owner.clone(), config.terry_per_lending);
@@ -362,6 +353,9 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         borrowing,
     );
 
+    // Emit borrow event
+    emit_borrow(&env, &owner);
+
     // Mint terry to user as rewards
     mint_terry(&env, owner.clone(), config.terry_per_lending);
 
@@ -427,6 +421,9 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
     user.power -= borrowing.power + interest_amount as u32;
 
     write_user(&env, owner.clone(), user);
+
+    // Emit repay event
+    emit_repay(&env, &owner);
 
     remove_borrowing(env.clone(), owner.clone(), category, token_id);
 
@@ -572,6 +569,9 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
     user.power += reward_interest as u32;
 
     write_user(&env, owner.clone(), user);
+
+    // Emit withdraw event
+    emit_withdraw(&env, &owner);
 
     remove_lending(env.clone(), owner.clone(), category, token_id);
 

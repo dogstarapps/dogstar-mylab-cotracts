@@ -58,10 +58,6 @@ fn mint_token(e: &Env, token: Address, to: Address, amount: i128) {
 
 fn create_metadata(e: &Env) -> CardMetadata {
     let metadata = CardMetadata {
-        name: String::from_str(&e, "Tessa Trend"),
-        base_uri: String::from_str(&e, ""),
-        thumb_uri: String::from_str(&e, ""),
-        description: String::from_str(&e, ""),
         initial_power: 1000,        // Set appropriate value
         max_power: 10000,           // Set appropriate value
         level: 1,                   // Set appropriate value
