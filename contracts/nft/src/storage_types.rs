@@ -153,6 +153,14 @@ pub struct Config {
     pub apy_alpha: u32,
     pub power_to_usdc_rate: i128, // e.g., 1000 for 0.10 USDC per POWER (1000/10000 = 0.10)
     pub dogstar_fee_percentage: u32, // Basis points (e.g., 500 = 5%)
+    pub t_max: u64, // Max loan duration in fixed-point (SCALE = 1_000_000), e.g., 500_000 for 0.5 years
+    pub fee_lend_bps: u32, // Lend fee in basis points (e.g., 100 = 1%)
+    pub fee_borrow_bps: u32, // Borrow fee in basis points (e.g., 100 = 1%)
+    pub safety_buffer_bps: u32, // Safety buffer in basis points (e.g., 500 = 5%)
+    pub terry_per_borrow: i128,
+    pub terry_per_repay: i128,
+    pub terry_per_withdraw: i128,
+    pub terry_daily_cap: i128, // Daily cap per player for Terry rewards
 }
 
 #[contracttype]
@@ -176,6 +184,8 @@ pub struct State {
     pub total_loan_count: u64,
     pub total_staked_power: u64,
     pub total_borrowed_power: u64,
+    pub total_weight: u64, // W: sum of all loan weights (reserves)
+    pub liquidation_index: u64, // L: global liquidation index (fixed-point)
 }
 
 #[derive(Clone, Debug)]

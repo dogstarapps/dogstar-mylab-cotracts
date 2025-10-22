@@ -213,3 +213,83 @@ pub fn emit_transfer(env: &Env, from: &Address, to: &Address) {
         (),
     );
 }
+
+/// Emits an event when APY is updated.
+pub fn emit_apy_updated(env: &Env, demand: u64, supply: u64, duration: u64, alpha: u64, apy: u64) {
+    env.events().publish(
+        (symbol_short!("apy_upd"),),
+        (demand, supply, duration, alpha, apy),
+    );
+}
+
+/// Emits an event when lend is deposited with details.
+pub fn emit_lend_deposited(env: &Env, lender: &Address, principal_gross: u32, fee: u32, principal_net: u32) {
+    env.events().publish(
+        (symbol_short!("lend_dep"), lender.clone()),
+        (principal_gross, fee, principal_net),
+    );
+}
+
+/// Emits an event when borrow is opened with reserve details.
+pub fn emit_borrow_opened(env: &Env, borrower: &Address, principal: u32, reserve: u64, collateral: u32, fee: u32) {
+    env.events().publish(
+        (symbol_short!("bor_open"), borrower.clone()),
+        (principal, reserve, collateral, fee),
+    );
+}
+
+/// Emits an event when withdraw is paid.
+pub fn emit_withdraw_paid(env: &Env, lender: &Address, principal: u32, interest: u64) {
+    env.events().publish(
+        (symbol_short!("wd_paid"), lender.clone()),
+        (principal, interest),
+    );
+}
+
+/// Emits an event when liquidation index is updated.
+pub fn emit_index_updated(env: &Env, new_index: u64, delta_index: u64, deficit: u64, total_weight: u64) {
+    env.events().publish(
+        (symbol_short!("idx_upd"),),
+        (new_index, delta_index, deficit, total_weight),
+    );
+}
+
+/// Emits an event when a loan is touched (haircut applied).
+pub fn emit_loan_touched(env: &Env, borrower: &Address, haircut: u64, reserve_remaining: u64, liquidated: bool) {
+    env.events().publish(
+        (symbol_short!("loan_tch"), borrower.clone()),
+        (haircut, reserve_remaining, liquidated),
+    );
+}
+
+/// Emits an event when card is locked.
+pub fn emit_card_locked(env: &Env, owner: &Address, action: Action) {
+    env.events().publish(
+        (symbol_short!("card_lck"), owner.clone()),
+        action,
+    );
+}
+
+/// Emits an event when card is unlocked.
+pub fn emit_card_unlocked(env: &Env, owner: &Address) {
+    env.events().publish(
+        (symbol_short!("card_ulk"), owner.clone()),
+        (),
+    );
+}
+
+/// Emits an event when fee is sent to Hawaii pot.
+pub fn emit_fee_to_hawaii(env: &Env, amount: u32, action: Action) {
+    env.events().publish(
+        (symbol_short!("fee_haw"),),
+        (amount, action),
+    );
+}
+
+/// Emits an event when Terry is awarded.
+pub fn emit_terry_awarded(env: &Env, player: &Address, amount: i128, action: Action, daily_total: i128) {
+    env.events().publish(
+        (symbol_short!("ter_awd"), player.clone()),
+        (amount, action, daily_total),
+    );
+}

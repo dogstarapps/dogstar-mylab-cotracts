@@ -68,6 +68,8 @@ pub fn read_state(e: &Env) -> State {
         total_loan_count: 0,
         total_staked_power: 0,
         total_borrowed_power: 0,
+        total_weight: 0,
+        liquidation_index: 0,
     })
 }
 

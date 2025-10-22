@@ -918,6 +918,18 @@ impl NFT {
     pub fn read_lendings(env: Env) -> Vec<Lending> {
         lending::read_lendings(env)
     }
+
+    pub fn touch_loan(env: Env, borrower: Address, category: Category, token_id: TokenId) {
+        lending::touch_loan(env, borrower, category, token_id)
+    }
+
+    pub fn touch_loans(env: Env, loan_ids: Vec<(Address, Category, TokenId)>) {
+        lending::touch_loans(env, loan_ids)
+    }
+
+    pub fn get_pending_haircut(env: Env, borrower: Address, category: Category, token_id: TokenId) -> u64 {
+        lending::get_pending_haircut(env, borrower, category, token_id)
+    }
 }
 
 #[contractimpl]
