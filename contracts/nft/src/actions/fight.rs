@@ -259,6 +259,11 @@ pub fn open_position(
         trigger_price =
             get_currency_price(env.clone(), config.oracle_contract_id, currency.clone());
     }
+    #[cfg(test)]
+    {
+        // Provide a deterministic mock price during tests
+        trigger_price = 1000;
+    }
     log!(&env, "fight >> trigger_price = ", trigger_price);
     // #[cfg(test)]
     // {

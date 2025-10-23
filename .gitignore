@@ -12,3 +12,6 @@ target
 /.cargo
 contracts/nft/src/config.json
 initialize_contract.sh
+
+# editor backups
+*.bak

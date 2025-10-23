@@ -166,6 +166,30 @@ pub fn emit_repay(env: &Env, player: &Address) {
     );
 }
 
+/// Emits an event when the liquidation index is updated (lazy pro‑rata)
+pub fn emit_index_updated(env: &Env, l_index: u64, d_l: u64, deficit: u64, w_total: u64) {
+    env.events().publish(
+        (symbol_short!("idx_upd"),),
+        (l_index, d_l, deficit, w_total),
+    );
+}
+
+/// Emits an event when a loan is touched and a haircut is applied
+pub fn emit_loan_touched(env: &Env, player: &Address, haircut: u32, reserve_left: u32, ownership_lost: bool) {
+    env.events().publish(
+        (symbol_short!("loan_tch"), player.clone()),
+        (haircut, reserve_left, ownership_lost),
+    );
+}
+
+/// Emits an event when a loan is fully liquidated
+pub fn emit_loan_liquidated(env: &Env, player: &Address) {
+    env.events().publish(
+        (symbol_short!("loan_liq"), player.clone()),
+        (),
+    );
+}
+
 /// Emits an event when a card is placed in a deck.
 pub fn emit_deck_place(env: &Env, player: &Address) {
     env.events().publish(

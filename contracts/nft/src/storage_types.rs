@@ -176,6 +176,22 @@ pub struct State {
     pub total_loan_count: u64,
     pub total_staked_power: u64,
     pub total_borrowed_power: u64,
+    // Realtime accumulators (seconds-based)
+    pub borrowed_time_seconds: u64,
+    pub loans_time_seconds: u64,
+    pub last_update_ts: u64,
+    pub active_loans: u64,
+    // Lazy pro‑rata liquidation index and total weight (sum of reserve_remaining)
+    pub l_index: u64,   // fixed-point SCALE=1e6
+    pub w_total: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BorrowMeta {
+    pub last_l_index: u64,     // last applied liquidation index (SCALE)
+    pub weight: u32,           // equals reserve_remaining at last update
+    pub reserve_remaining: u32 // remaining reserve earmarked for interest/haircuts
 }
 
 #[derive(Clone, Debug)]
@@ -205,6 +221,7 @@ pub enum DataKey {
     Lending(Address, Category, TokenId),
     Borrowings,
     Borrowing(Address, Category, TokenId),
+    BorrowMeta(Address, Category, TokenId),
     Fights,
     Fight(Address, Category, TokenId),
     // NFT metadata and ID management

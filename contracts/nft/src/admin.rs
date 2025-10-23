@@ -66,6 +66,12 @@ pub fn read_state(e: &Env) -> State {
         total_interest: 0,
         total_loan_duration: 0,
         total_loan_count: 0,
+        borrowed_time_seconds: 0,
+        loans_time_seconds: 0,
+        last_update_ts: e.ledger().timestamp(),
+        active_loans: 0,
+        l_index: 0,
+        w_total: 0,
         total_staked_power: 0,
         total_borrowed_power: 0,
     })
