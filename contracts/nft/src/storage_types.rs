@@ -157,6 +157,7 @@ pub struct Config {
     pub fee_lend_bps: u32, // Lend fee in basis points (e.g., 100 = 1%)
     pub fee_borrow_bps: u32, // Borrow fee in basis points (e.g., 100 = 1%)
     pub safety_buffer_bps: u32, // Safety buffer in basis points (e.g., 500 = 5%)
+    pub min_reserve_bps: u32, // Minimum reserve as % of principal (e.g., 1000 = 10%)
     pub terry_per_borrow: i128,
     pub terry_per_repay: i128,
     pub terry_per_withdraw: i128,

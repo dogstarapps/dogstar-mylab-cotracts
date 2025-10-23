@@ -156,7 +156,6 @@ pub fn write_borrowing(
 }
 
 pub fn read_borrowing(env: Env, user: Address, category: Category, token_id: TokenId) -> Borrowing {
-    user.require_auth();
     let owner = read_user(&env, user).owner;
 
     let key = DataKey::Borrowing(owner.clone(), category.clone(), token_id.clone());
@@ -204,8 +203,9 @@ pub fn calculate_apy(
     total_loan_count: u64,
     alpha: u64,
 ) -> u64 {
+    // Per spec: "If no one borrows, the APY is 0"
     if total_demand == 0 || total_offer == 0 || total_loan_count == 0 {
-        return APY_MIN;
+        return APY_MIN; // 0%
     }
     let demand_ratio = total_demand * SCALE / total_offer;
     let average_duration = total_loan_duration * SCALE / total_loan_count;
@@ -359,7 +359,11 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
     let borrow_fee: u32 = (power_requested as u64 * config.fee_borrow_bps as u64 / 10000) as u32;
     let principal_net: u32 = power_requested.saturating_sub(borrow_fee);
 
-    let reserve = calculate_reserve(principal_net as u64, apy, t_max);
+    let calculated_reserve = calculate_reserve(principal_net as u64, apy, t_max);
+    let min_reserve = (principal_net as u64 * config.min_reserve_bps as u64) / 10000;
+    let reserve = calculated_reserve.max(min_reserve);
+
+    assert!(reserve > 0, "Reserve must be positive to protect lenders");
 
     let buffer = (collateral_power as u64 * config.safety_buffer_bps as u64) / 10000;
     let total_required = principal_net as u64 + reserve + borrow_fee as u64 + buffer;
@@ -517,13 +521,6 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
         token_id.clone(),
     );
 
-    let (haircut, liquidated) = apply_haircut(&env, &mut borrowing, &state);
-
-    if liquidated {
-        emit_loan_touched(&env, &owner, haircut, 0, true);
-        return;
-    }
-
     let config = read_config(&env);
     let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
 
@@ -547,12 +544,20 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
         "Insufficient Global POWER to repay"
     );
 
+    // Apply haircut AFTER checking user can repay
+    // Even if reserve is depleted (liquidated), allow repayment if user has sufficient power
+    let (haircut, liquidated) = apply_haircut(&env, &mut borrowing, &state);
+
+    // If liquidated but user can repay, process the repayment anyway
+    // User loses collateral reserve but clears their debt
+
     user_data.power = (user_data.power as u64 - total_repay) as u32;
     write_user(&env, owner.clone(), user_data);
 
-    // Return principal to pool, add interest to pool
-    state.total_offer += borrowing.principal as u64;
-    state.total_interest += interest_amount;
+    // Return principal + interest to pool (borrower pays both)
+    // Bug Fix: Was only returning principal, now returning total_repay (principal + interest)
+    state.total_offer += total_repay; // Principal + interest returned to pool for lenders
+    state.total_interest += interest_amount; // Track total interest collected
     state.total_borrowed_power -= borrowing.principal as u64;
     state.total_weight = state.total_weight.saturating_sub(borrowing.weight);
 
@@ -613,25 +618,48 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
     );
     let interest_due = calculate_interest(lending.principal_net as u64, apy, loan_duration);
 
+    // SPEC REQUIREMENT: Check if interest reserve is sufficient before withdrawal
+    // Per spec section 2.4: "Before payment, the contract checks whether the interest
+    // reserve is sufficient to cover the total accrued interest. If the reserve is
+    // insufficient, the contract triggers a liquidation process"
+
+    // The total_weight represents the sum of all active borrower reserves
+    // If interest needed exceeds available reserves, trigger proportional liquidation
+    let total_interest_reserve = state.total_weight;
+
+    // Check if we need to liquidate borrower reserves to cover interest
+    if interest_due > 0 && total_interest_reserve < interest_due {
+        let reserve_deficit = interest_due - total_interest_reserve;
+
+        // Update liquidation index to trigger proportional haircuts on all borrowers
+        if state.total_weight > 0 {
+            let delta_l = (reserve_deficit * SCALE) / state.total_weight;
+            state.liquidation_index += delta_l;
+
+            emit_index_updated(&env, state.liquidation_index, delta_l, reserve_deficit, state.total_weight);
+        }
+    }
+
+    // Now check pool liquidity for the actual payout
     let available_pool = state.total_offer;
     let total_payout = lending.principal_net as u64 + interest_due;
 
     if available_pool >= total_payout {
-        // Sufficient liquidity
+        // Sufficient liquidity in pool
         state.total_offer -= total_payout;
     } else {
-        // Deficit: apply lazy pro-rata
+        // Pool deficit: apply lazy pro-rata liquidation
         let payout_from_pool = available_pool;
-        let deficit = total_payout - payout_from_pool;
+        let pool_deficit = total_payout - payout_from_pool;
 
         state.total_offer = 0;
 
-        // Update liquidation index
+        // Update liquidation index for pool deficit as well
         if state.total_weight > 0 {
-            let delta_l = (deficit * SCALE) / state.total_weight;
+            let delta_l = (pool_deficit * SCALE) / state.total_weight;
             state.liquidation_index += delta_l;
 
-            emit_index_updated(&env, state.liquidation_index, delta_l, deficit, state.total_weight);
+            emit_index_updated(&env, state.liquidation_index, delta_l, pool_deficit, state.total_weight);
         }
     }
 

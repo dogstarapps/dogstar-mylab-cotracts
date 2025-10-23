@@ -358,6 +358,18 @@ impl NFT {
         read_config(&env)
     }
 
+    pub fn update_config(env: Env, config: Config) {
+        let admin = read_administrator(&env);
+        admin.require_auth();
+        write_config(&env, &config);
+
+        // Emit event for config update
+        env.events().publish(
+            (soroban_sdk::symbol_short!("cfg_upd"),),
+            config.clone(),
+        );
+    }
+
     pub fn create_metadata(e: &Env, card: CardMetadata, id: u32) {
         let admin = read_administrator(&e);
         admin.require_auth();
