@@ -13,6 +13,7 @@ use crate::event::{emit_lend, emit_borrow, emit_withdraw, emit_repay};
 const SCALE: u64 = 1_000_000; // 6-decimal fixed point
 const APY_MIN: u64 = 0; // 0% APY
 const APY_MAX: u64 = 300_000; // 30% APY = 0.30 * SCALE
+const T_MAX_FP: u64 = 500_000; // 0.5 years in SCALE for reserve horizon
 
 #[contracttype]
 #[derive(Clone, PartialEq)]
@@ -205,18 +206,35 @@ pub fn calculate_apy(
     total_loan_count: u64,
     alpha: u64,
 ) -> u64 {
-    if total_demand == 0 || total_offer == 0 || total_loan_count == 0 {
-        return APY_MIN;
+    // Avoid divisions by zero and clamp utilization/time factors
+    // Utilization proxy based on current aggregates; add small epsilon to offer
+    let offer_eps = total_offer.saturating_add(1);
+    let mut demand_ratio = (total_demand as u128)
+        .saturating_mul(SCALE as u128)
+        / (offer_eps as u128);
+    if demand_ratio > SCALE as u128 {
+        demand_ratio = SCALE as u128;
     }
-    let demand_ratio = total_demand * SCALE / total_offer;
-    let average_duration = total_loan_duration * SCALE / total_loan_count;
-    let alpha_t = alpha * average_duration / SCALE;
-    let time_denom = SCALE + alpha_t;
-    let time_factor = SCALE * SCALE / time_denom;
-    let multiplier = demand_ratio * time_factor / SCALE;
-    let apy_range = APY_MAX - APY_MIN;
-    let apy = APY_MIN + (apy_range * multiplier / SCALE);
-    apy
+
+    // Average duration with a minimal floor (1 hour in the same units used by the state)
+    let average_duration = if total_loan_count == 0 {
+        SCALE // 1 hour in fixed point
+    } else {
+        total_loan_duration.saturating_mul(SCALE) / total_loan_count
+    };
+
+    let alpha_t = (alpha as u128)
+        .saturating_mul(average_duration as u128)
+        / (SCALE as u128);
+    let time_denom = (SCALE as u128).saturating_add(alpha_t);
+    let time_factor = ((SCALE as u128) * (SCALE as u128)) / time_denom;
+    let multiplier = (demand_ratio.saturating_mul(time_factor)) / (SCALE as u128);
+    let apy_range = (APY_MAX - APY_MIN) as u128;
+    let mut apy = (APY_MIN as u128).saturating_add((apy_range.saturating_mul(multiplier)) / (SCALE as u128));
+    if apy > APY_MAX as u128 {
+        apy = APY_MAX as u128;
+    }
+    apy as u64
 }
 
 fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
@@ -241,8 +259,9 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
     );
     assert!(nft.power >= power, "Exceed power amount to lend");
 
+    // Move gross power out of the card; fee goes to pot, net to pool (state.offer)
+    nft.power = nft.power.saturating_sub(power);
     nft.locked_by_action = Action::Lend;
-
     write_nft(&env.clone(), owner.clone(), token_id.clone(), nft);
 
     let mut balance = read_balance(&env);
@@ -251,7 +270,7 @@ pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, powe
 
     let mut state = read_state(&env);
 
-    state.total_offer += lend_amount as u64;
+    state.total_offer += lend_amount as u64; // principal_net supplied to pool
 
     write_state(&env, &state);
 
@@ -290,6 +309,10 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
     let power_fee: u32 = power.saturating_mul(config.power_action_fee) / 100;
     let borrow_amount: u32 = power.saturating_sub(power_fee);
 
+    // Borrow > 0 validations
+    assert!(power > 0, "Invalid borrow: zero");
+    assert!(borrow_amount > 0, "Invalid borrow: net <= 0");
+
     assert!(
         category == Category::Resource || category == Category::Leader,
         "Invalid Category to borrow"
@@ -304,16 +327,14 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
     // config already read above
 
     let mut state = read_state(&env);
-    assert!(
-        state.total_offer >= power as u64,
-        "Insufficient power to borrow"
-    );
+    assert!(state.total_offer >= borrow_amount as u64, "Insufficient power to borrow");
 
-    state.total_offer -= power as u64;
+    // Tentatively update pool before APY to compute post-borrow state
+    state.total_offer -= borrow_amount as u64;
     state.total_borrowed_power += borrow_amount as u64;
-
     write_state(&env, &state);
 
+    // Compute APY and reserve using horizon T_MAX and guard k<1
     let apy = calculate_apy(
         state.total_demand,
         state.total_offer,
@@ -321,11 +342,31 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         state.total_loan_count,
         config.apy_alpha as u64,
     );
-    let reserve = power as u64 + calculate_interest(power as u64, apy, 4_380);
-    assert!(nft.power as u64 >= reserve, "Exceed power amount to borrow");
+
+    // k = APY * T_MAX in fixed point
+    let k_fp = (apy as u128)
+        .saturating_mul(T_MAX_FP as u128)
+        / (SCALE as u128);
+    assert!(k_fp < SCALE as u128, "Invalid horizon: APY*T_max >= 1");
+    // Reserve = P * k / (1 - k)
+    let reserve = (borrow_amount as u128)
+        .saturating_mul(k_fp)
+        / ((SCALE as u128).saturating_sub(k_fp));
+
+    // Fee and buffer checks
+    let buffer_bps: u32 = 500; // 5% default safety buffer
+    let collateral_net = (nft.power as u128).saturating_sub(power_fee as u128);
+    let buffer = (collateral_net.saturating_mul(buffer_bps as u128)) / 10_000u128;
+    let lhs = (borrow_amount as u128)
+        .saturating_add(reserve)
+        .saturating_add(power_fee as u128)
+        .saturating_add(buffer);
+    assert!(lhs <= nft.power as u128, "Exceeds collateral capacity");
 
     nft.locked_by_action = Action::Borrow;
 
+    // Deduct fee immediately from collateral card and lock
+    nft.power = nft.power.saturating_sub(power_fee);
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     let mut balance = read_balance(&env);
@@ -558,8 +599,9 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     write_state(&env, &state);
 
+    // Return principal_net to the same card and unlock
+    nft.power = nft.power.saturating_add(lending.power);
     nft.locked_by_action = Action::None;
-
     write_nft(&env, owner.clone(), token_id.clone(), nft);
 
     let power_fee: u32 =
