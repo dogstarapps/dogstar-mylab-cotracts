@@ -200,40 +200,37 @@ pub fn read_borrowings(env: Env) -> Vec<Borrowing> {
 }
 
 pub fn calculate_apy(
-    total_demand: u64,
+    total_borrowed_power: u64,
     total_offer: u64,
-    total_loan_duration: u64,
-    total_loan_count: u64,
+    loans_time_seconds: u64,
+    active_loans: u64,
     alpha: u64,
 ) -> u64 {
-    // Avoid divisions by zero and clamp utilization/time factors
-    // Utilization proxy based on current aggregates; add small epsilon to offer
-    let offer_eps = total_offer.saturating_add(1);
-    let mut demand_ratio = (total_demand as u128)
-        .saturating_mul(SCALE as u128)
-        / (offer_eps as u128);
-    if demand_ratio > SCALE as u128 {
-        demand_ratio = SCALE as u128;
+    // Utilization U = B / (B + S + eps)
+    let denom = (total_borrowed_power as u128)
+        .saturating_add(total_offer as u128)
+        .saturating_add(1); // epsilon to avoid div-by-zero
+    let mut u_fp = ((total_borrowed_power as u128) * (SCALE as u128)) / denom;
+    if u_fp > SCALE as u128 {
+        u_fp = SCALE as u128;
     }
 
-    // Average duration with a minimal floor (1 hour in the same units used by the state)
-    let average_duration = if total_loan_count == 0 {
-        SCALE // 1 hour in fixed point
-    } else {
-        total_loan_duration.saturating_mul(SCALE) / total_loan_count
-    };
+    // Average loan time in years with a floor T_floor_seconds
+    const SECONDS_PER_YEAR: u64 = 31_536_000;
+    const T_FLOOR_SECONDS: u64 = 3_600; // 1 hour
+    let n = active_loans.max(1);
+    let avg_seconds = loans_time_seconds / n;
+    let t_seconds = avg_seconds.max(T_FLOOR_SECONDS);
+    let t_years_fp = ((t_seconds as u128) * (SCALE as u128)) / (SECONDS_PER_YEAR as u128);
 
-    let alpha_t = (alpha as u128)
-        .saturating_mul(average_duration as u128)
-        / (SCALE as u128);
-    let time_denom = (SCALE as u128).saturating_add(alpha_t);
-    let time_factor = ((SCALE as u128) * (SCALE as u128)) / time_denom;
-    let multiplier = (demand_ratio.saturating_mul(time_factor)) / (SCALE as u128);
+    // APY = APY_min + (APY_max-APY_min) * U * 1/(1+alpha*T)
+    let one = SCALE as u128;
+    let time_denom = one.saturating_add(((alpha as u128) * t_years_fp) / one);
+    let time_factor = (one * one) / time_denom;
+    let mul = (u_fp * time_factor) / one;
     let apy_range = (APY_MAX - APY_MIN) as u128;
-    let mut apy = (APY_MIN as u128).saturating_add((apy_range.saturating_mul(multiplier)) / (SCALE as u128));
-    if apy > APY_MAX as u128 {
-        apy = APY_MAX as u128;
-    }
+    let mut apy = (APY_MIN as u128) + (apy_range * mul) / one;
+    if apy > APY_MAX as u128 { apy = APY_MAX as u128; }
     apy as u64
 }
 
@@ -365,10 +362,10 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
 
     // Compute APY and reserve using horizon T_MAX and guard k<1
     let apy = calculate_apy(
-        state.total_demand,
+        state.total_borrowed_power,
         state.total_offer,
-        state.total_loan_duration,
-        state.total_loan_count,
+        state.loans_time_seconds,
+        state.active_loans,
         config.apy_alpha as u64,
     );
 
@@ -494,10 +491,10 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
     state.total_loan_count += 1;
 
     let apy = calculate_apy(
-        state.total_demand,
+        state.total_borrowed_power,
         state.total_offer,
-        state.total_loan_duration,
-        state.total_loan_count,
+        state.loans_time_seconds,
+        state.active_loans,
         config.apy_alpha as u64,
     );
     let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
@@ -699,10 +696,10 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     let loan_duration = (env.ledger().timestamp() - lending.lent_at) / 3_600;
     let apy = calculate_apy(
-        state.total_demand,
+        state.total_borrowed_power,
         state.total_offer,
-        state.total_loan_duration,
-        state.total_loan_count,
+        state.loans_time_seconds,
+        state.active_loans,
         config.apy_alpha as u64,
     );
     let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration);
@@ -760,10 +757,10 @@ pub fn get_current_apy(env: Env) -> u64 {
     let state = read_state(&env);
 
     calculate_apy(
-        state.total_demand,
+        state.total_borrowed_power,
         state.total_offer,
-        state.total_loan_duration,
-        state.total_loan_count,
+        state.loans_time_seconds,
+        state.active_loans,
         config.apy_alpha as u64,
     )
 }

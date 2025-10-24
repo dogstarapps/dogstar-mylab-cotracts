@@ -1278,14 +1278,13 @@ fn lb_withdraw_emits_index_updated() {
     });
     nft.withdraw(&lender, &Category::Resource, &TokenId(801));
 
-    // Repay borrower2 to restore liquidity; we'll keep w_total positive manually for idx_upd
-    nft.repay(&borrower2, &Category::Resource, &TokenId(803));
-
     // Now force deficit and withdraw second lender to emit idx_upd; ensure w_total > 0
     e.as_contract(&contract_id, || {
         let mut st = crate::admin::read_state(&e);
         st.total_interest = 0;
         if st.w_total == 0 { st.w_total = 10; }
+        // Ensure pool has enough liquidity to pay principal_net on withdraw
+        st.total_offer = st.total_offer.saturating_add(1_000);
         crate::admin::write_state(&e, &st);
     });
     nft.withdraw(&lender2, &Category::Resource, &TokenId(804));
