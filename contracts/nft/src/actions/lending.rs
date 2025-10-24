@@ -234,8 +234,13 @@ pub fn calculate_apy(
     apy as u64
 }
 
-fn calculate_interest(principal: u64, apy: u64, loan_duration: u64) -> u64 {
-    principal * apy * loan_duration / 8_760 / SCALE
+fn calculate_interest(principal: u64, apy: u64, duration_seconds: u64) -> u64 {
+    const SECONDS_PER_YEAR: u64 = 31_536_000;
+    principal
+        .saturating_mul(apy)
+        .saturating_mul(duration_seconds)
+        / SECONDS_PER_YEAR
+        / SCALE
 }
 
 pub fn lend(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) {
@@ -485,10 +490,7 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
 
     let mut state = read_state(&env);
 
-    let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
-    state.total_demand += borrowing.power as u64 * loan_duration;
-    state.total_loan_duration += loan_duration;
-    state.total_loan_count += 1;
+    let loan_duration_seconds = env.ledger().timestamp().saturating_sub(borrowing.borrowed_at);
 
     let apy = calculate_apy(
         state.total_borrowed_power,
@@ -497,7 +499,7 @@ pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {
         state.active_loans,
         config.apy_alpha as u64,
     );
-    let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
+    let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration_seconds);
     state.total_interest += interest_amount as u64;
     state.total_offer += borrowing.power as u64;
     state.total_borrowed_power -= borrowing.power as u64;
@@ -555,8 +557,8 @@ fn check_liquidations(env: Env) {
             state.total_loan_count,
             config.apy_alpha as u64,
         );
-        let loan_duration = (env.ledger().timestamp() - borrowing.borrowed_at) / 3_600;
-        let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration);
+    let loan_duration_seconds = env.ledger().timestamp().saturating_sub(borrowing.borrowed_at);
+    let interest_amount = calculate_interest(borrowing.power as u64, apy, loan_duration_seconds);
 
         if nft.power < borrowing.power + interest_amount as u32 {
             state.total_interest += nft.power as u64;
@@ -694,7 +696,7 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
 
     let mut state = read_state(&env);
 
-    let loan_duration = (env.ledger().timestamp() - lending.lent_at) / 3_600;
+    let loan_duration_seconds = env.ledger().timestamp().saturating_sub(lending.lent_at);
     let apy = calculate_apy(
         state.total_borrowed_power,
         state.total_offer,
@@ -702,7 +704,7 @@ pub fn withdraw(env: Env, user: Address, category: Category, token_id: TokenId) 
         state.active_loans,
         config.apy_alpha as u64,
     );
-    let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration);
+    let interest_amount = calculate_interest(lending.power as u64, apy, loan_duration_seconds);
 
     if state.total_interest < interest_amount {
         // Emit index update for lazy pro‑rata: deficit -> dL = Δ / W
