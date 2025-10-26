@@ -907,7 +907,6 @@ impl NFT {
         category: Category,
         token_id: TokenId,
     ) -> lending::Borrowing {
-        player.require_auth();
         lending::read_borrowing(env, player, category, token_id)
     }
 
