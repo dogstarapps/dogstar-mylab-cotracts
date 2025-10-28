@@ -917,6 +917,10 @@ impl NFT {
     pub fn read_lendings(env: Env) -> Vec<Lending> {
         lending::read_lendings(env)
     }
+
+    pub fn touch_loans(env: Env, loans: Vec<(Address, Category, TokenId)>) {
+        lending::touch_loans(env, loans)
+    }
 }
 
 #[contractimpl]
