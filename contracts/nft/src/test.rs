@@ -1031,6 +1031,64 @@ fn lb_borrow_exceeds_pool() {
 }
 
 #[test]
+fn lb_borrow_quote_insufficient_pool() {
+    let (e, contract_id) = create_test_env();
+    let admin = Address::generate(&e);
+    let lender = Address::generate(&e);
+    let borrower = Address::generate(&e);
+    let nft = create_nft(e.clone(), &contract_id, &admin, &generate_config(&e));
+
+    nft.create_user(&lender);
+    nft.create_user(&borrower);
+    nft.mint_terry(&lender, &100000);
+    nft.mint_terry(&borrower, &100000);
+
+    let mut md_l = create_metadata(&e); md_l.token_id = 901; md_l.category = Category::Resource; md_l.initial_power = 1000; md_l.max_power = 20000;
+    let mut md_b = create_metadata(&e); md_b.token_id = 902; md_b.category = Category::Resource; md_b.initial_power = 5000; md_b.max_power = 20000;
+    nft.create_metadata(&md_l, &901);
+    nft.create_metadata(&md_b, &902);
+    nft.mint(&lender, &TokenId(901), &1, &Currency::Terry);
+    nft.mint(&borrower, &TokenId(902), &1, &Currency::Terry);
+
+    // Provide small liquidity (~99 net)
+    nft.lend(&lender, &Category::Resource, &TokenId(901), &100);
+
+    // Request 200 gross (~198 net) > pool (~99 net)
+    let quote = nft.borrow_quote(&borrower, &Category::Resource, &TokenId(902), &200);
+    assert!(!quote.allowed);
+    assert_eq!(quote.reason, 2);
+}
+
+#[test]
+fn lb_borrow_quote_exceeds_collateral() {
+    let (e, contract_id) = create_test_env();
+    let admin = Address::generate(&e);
+    let lender = Address::generate(&e);
+    let borrower = Address::generate(&e);
+    let nft = create_nft(e.clone(), &contract_id, &admin, &generate_config(&e));
+
+    nft.create_user(&lender);
+    nft.create_user(&borrower);
+    nft.mint_terry(&lender, &100000);
+    nft.mint_terry(&borrower, &100000);
+
+    let mut md_l = create_metadata(&e); md_l.token_id = 903; md_l.category = Category::Resource; md_l.initial_power = 5000; md_l.max_power = 20000;
+    let mut md_b = create_metadata(&e); md_b.token_id = 904; md_b.category = Category::Resource; md_b.initial_power = 300; md_b.max_power = 20000;
+    nft.create_metadata(&md_l, &903);
+    nft.create_metadata(&md_b, &904);
+    nft.mint(&lender, &TokenId(903), &1, &Currency::Terry);
+    nft.mint(&borrower, &TokenId(904), &1, &Currency::Terry);
+
+    // Provide ample liquidity
+    nft.lend(&lender, &Category::Resource, &TokenId(903), &1000);
+
+    // Request 300 gross (~297 net) against small collateral; expect capacity fail (reason 3)
+    let quote = nft.borrow_quote(&borrower, &Category::Resource, &TokenId(904), &300);
+    assert!(!quote.allowed);
+    assert_eq!(quote.reason, 3);
+}
+
+#[test]
 fn lb_touch_loans_partial_haircut() {
     let (e, contract_id) = create_test_env();
     let admin = Address::generate(&e);

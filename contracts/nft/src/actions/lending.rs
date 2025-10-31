@@ -35,6 +35,19 @@ pub struct Borrowing {
     pub borrowed_at: u64,
 }
 
+#[contracttype]
+#[derive(Clone, PartialEq)]
+pub struct BorrowQuote {
+    pub allowed: bool,
+    pub reason: u32, // 0=OK,1=Zero,2=InsufficientPool,3=ExceedsCollateral,4=InvalidHorizon
+    pub apy: u64,
+    pub fee: u32,
+    pub reserve: u64,
+    pub buffer: u64,
+    pub borrow_net: u32,
+    pub max_suggested_gross: u32,
+}
+
 pub fn write_lending(
     env: Env,
     user: Address,
@@ -359,18 +372,19 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
     let mut state = read_state(&env);
     assert!(state.total_offer >= borrow_amount as u64, "Insufficient power to borrow");
 
-    // Tentatively update pool before APY to compute post-borrow state
-    state.total_offer -= borrow_amount as u64;
-    state.total_borrowed_power += borrow_amount as u64;
-    state.active_loans = state.active_loans.saturating_add(1);
-    write_state(&env, &state);
+    // Pre-validate using hypothetical post-borrow state (no mutation yet)
+    let offer_after = state.total_offer.saturating_sub(borrow_amount as u64);
+    let borrowed_after = state
+        .total_borrowed_power
+        .saturating_add(borrow_amount as u64);
+    let active_loans_after = state.active_loans.saturating_add(1);
 
     // Compute APY and reserve using horizon T_MAX and guard k<1
     let apy = calculate_apy(
-        state.total_borrowed_power,
-        state.total_offer,
+        borrowed_after,
+        offer_after,
         state.loans_time_seconds,
-        state.active_loans,
+        active_loans_after,
         config.apy_alpha as u64,
     );
 
@@ -393,6 +407,12 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
         .saturating_add(power_fee as u128)
         .saturating_add(buffer);
     assert!(lhs <= nft.power as u128, "Exceeds collateral capacity");
+
+    // Now commit the state mutations after successful validation
+    state.total_offer = offer_after;
+    state.total_borrowed_power = borrowed_after;
+    state.active_loans = active_loans_after;
+    write_state(&env, &state);
 
     nft.locked_by_action = Action::Borrow;
 
@@ -447,6 +467,119 @@ pub fn borrow(env: Env, user: Address, category: Category, token_id: TokenId, po
 
     balance.haw_ai_terry += config.terry_per_lending * config.haw_ai_percentage as i128 / 100;
     write_balance(&env, &balance);
+}
+
+pub fn borrow_quote(env: Env, user: Address, category: Category, token_id: TokenId, power: u32) -> BorrowQuote {
+    let owner = read_user(&env, user).owner;
+    let config = read_config(&env);
+    let fee = power.saturating_mul(config.power_action_fee) / 100;
+    let borrow_net: u32 = power.saturating_sub(fee);
+
+    if power == 0 || borrow_net == 0 {
+        return BorrowQuote {
+            allowed: false,
+            reason: 1,
+            apy: 0,
+            fee,
+            reserve: 0,
+            buffer: 0,
+            borrow_net,
+            max_suggested_gross: 0,
+        };
+    }
+
+    let nft = read_nft(&env, owner.clone(), token_id.clone()).unwrap();
+    let st = read_state(&env);
+
+    if st.total_offer < borrow_net as u64 {
+        return BorrowQuote {
+            allowed: false,
+            reason: 2,
+            apy: 0,
+            fee,
+            reserve: 0,
+            buffer: 0,
+            borrow_net,
+            max_suggested_gross: 0,
+        };
+    }
+
+    let offer_after = st.total_offer.saturating_sub(borrow_net as u64);
+    let borrowed_after = st
+        .total_borrowed_power
+        .saturating_add(borrow_net as u64);
+    let active_loans_after = st.active_loans.saturating_add(1);
+
+    let apy = calculate_apy(
+        borrowed_after,
+        offer_after,
+        st.loans_time_seconds,
+        active_loans_after,
+        config.apy_alpha as u64,
+    );
+
+    let k_fp = (apy as u128)
+        .saturating_mul(T_MAX_FP as u128)
+        / (SCALE as u128);
+    if k_fp >= SCALE as u128 {
+        return BorrowQuote {
+            allowed: false,
+            reason: 4,
+            apy,
+            fee,
+            reserve: 0,
+            buffer: 0,
+            borrow_net,
+            max_suggested_gross: 0,
+        };
+    }
+
+    let reserve = ((borrow_net as u128)
+        .saturating_mul(k_fp))
+        / ((SCALE as u128).saturating_sub(k_fp));
+    let buffer_bps: u32 = 500; // 5%
+    let collateral_net = (nft.power as u128).saturating_sub(fee as u128);
+    let buffer = (collateral_net.saturating_mul(buffer_bps as u128)) / 10_000u128;
+    let lhs = (borrow_net as u128)
+        .saturating_add(reserve)
+        .saturating_add(fee as u128)
+        .saturating_add(buffer);
+
+    if lhs > nft.power as u128 {
+        // Conservative suggestion assuming APY fixed at this quote
+        let numer = (nft.power as u128)
+            .saturating_sub(fee as u128)
+            .saturating_sub(buffer);
+        let borrow_net_max = (numer.saturating_mul((SCALE as u128).saturating_sub(k_fp))) / (SCALE as u128);
+        let gross_suggested = ((borrow_net_max as u128) * 100u128)
+            / ((100u128).saturating_sub(config.power_action_fee as u128));
+        return BorrowQuote {
+            allowed: false,
+            reason: 3,
+            apy,
+            fee,
+            reserve: reserve as u64,
+            buffer: buffer as u64,
+            borrow_net,
+            max_suggested_gross: gross_suggested as u32,
+        };
+    }
+
+    // Also cap by liquidity (net)
+    let borrow_net_cap = st.total_offer.min(borrow_net as u64) as u32;
+    let gross_cap = ((borrow_net_cap as u128) * 100u128)
+        / ((100u128).saturating_sub(config.power_action_fee as u128));
+
+    BorrowQuote {
+        allowed: true,
+        reason: 0,
+        apy,
+        fee,
+        reserve: reserve as u64,
+        buffer: buffer as u64,
+        borrow_net,
+        max_suggested_gross: gross_cap as u32,
+    }
 }
 
 pub fn repay(env: Env, user: Address, category: Category, token_id: TokenId) {

@@ -892,6 +892,16 @@ impl NFT {
         lending::get_current_apy(env)
     }
 
+    pub fn borrow_quote(
+        env: Env,
+        borrower: Address,
+        category: Category,
+        token_id: TokenId,
+        power: u32,
+    ) -> lending::BorrowQuote {
+        lending::borrow_quote(env, borrower, category, token_id, power)
+    }
+
     pub fn read_lending(
         env: Env,
         player: Address,
