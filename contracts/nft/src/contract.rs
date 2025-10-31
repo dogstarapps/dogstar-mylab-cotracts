@@ -892,6 +892,16 @@ impl NFT {
         lending::get_current_apy(env)
     }
 
+    pub fn borrow_quote(
+        env: Env,
+        borrower: Address,
+        category: Category,
+        token_id: TokenId,
+        power: u32,
+    ) -> lending::BorrowQuote {
+        lending::borrow_quote(env, borrower, category, token_id, power)
+    }
+
     pub fn read_lending(
         env: Env,
         player: Address,
@@ -907,7 +917,6 @@ impl NFT {
         category: Category,
         token_id: TokenId,
     ) -> lending::Borrowing {
-        player.require_auth();
         lending::read_borrowing(env, player, category, token_id)
     }
 
@@ -917,6 +926,10 @@ impl NFT {
 
     pub fn read_lendings(env: Env) -> Vec<Lending> {
         lending::read_lendings(env)
+    }
+
+    pub fn touch_loans(env: Env, loans: Vec<(Address, Category, TokenId)>) {
+        lending::touch_loans(env, loans)
     }
 }
 
